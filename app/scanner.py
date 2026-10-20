@@ -14,6 +14,8 @@ import yaml
 from app.rules import RULES, Finding, check_object, severity_at_least
 
 YAML_SUFFIXES = {".yaml", ".yml"}
+_Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)  # C parser when available (much faster)
+MAX_FILE_BYTES = 5 * 1024 * 1024
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".terraform", "vendor"}
 CONFIG_NAMES = (".kubeaudit.yaml", ".kubeaudit.yml")
 
@@ -95,8 +97,8 @@ def _line_for(node: Optional[yaml.Node], path: Tuple[Any, ...]) -> int:
 
 def _parse(text: str) -> List[Tuple[Dict[str, Any], Optional[yaml.Node], Tuple[Any, ...]]]:
     """Parse multi-doc YAML into (object, node, path-prefix) triples, unwrapping `kind: List`."""
-    nodes = list(yaml.compose_all(text, Loader=yaml.SafeLoader))
-    docs = list(yaml.safe_load_all(text))
+    nodes = list(yaml.compose_all(text, Loader=_Loader))
+    docs = list(yaml.load_all(text, Loader=_Loader))
     out = []
     for node, doc in zip(nodes, docs):
         if not isinstance(doc, dict):
@@ -235,6 +237,9 @@ def scan(paths: List[str], root: Path, cfg: Config) -> ScanResult:
     for f in files:
         rel = _rel(f, root)
         try:
+            if f.stat().st_size > MAX_FILE_BYTES:
+                warnings.append(f"{rel}: larger than 5 MB, skipped")
+                continue
             text = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as e:
             warnings.append(f"{rel}: could not read ({e})")
