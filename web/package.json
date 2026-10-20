@@ -1,0 +1,17 @@
+{
+  "name": "kubeaudit-web",
+  "version": "1.0.0",
+  "description": "KubeAudit AI web app",
+  "scripts": {
+    "build": "node build.mjs",
+    "test:parity": "node test/parity.mjs",
+    "test:browser": "node test/browser.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0",
+    "playwright-core": "1.48.2",
+    "yaml": "2.5.1"
+  },
+  "type": "module",
+  "private": true
+}

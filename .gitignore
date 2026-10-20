@@ -17,3 +17,7 @@ values-current.yaml
 # Python build output
 build/
 *.egg-info/
+
+# Web app
+web/node_modules/
+web/dist/

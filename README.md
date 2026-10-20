@@ -9,6 +9,14 @@ KubeAudit AI scans Kubernetes YAML and Helm charts, points to the exact line of 
 - ⛵ Helm charts are rendered with `helm template` before scanning, so templated values are checked too
 - 🧩 Works offline. The scanner needs only Python and PyYAML, and no code leaves your runner
 
+## Web app
+
+**Open it: https://msharsha565-create.github.io/KubeAudit-Ai/**
+
+Paste or drop Kubernetes YAML and get a security score, each problem marked on its line with the fix, and a one-click hardened file. It runs entirely in your browser (nothing is uploaded), works offline, and can be installed on a phone or desktop from the browser menu ("Install app" / "Add to Home Screen").
+
+The web app uses a JavaScript port of the same rule engine. CI checks that both engines report identical findings, and that the auto-fixer removes every fixable issue without changing anything else in the file.
+
 ## GitHub Action
 
 Add `.github/workflows/kubeaudit.yml`:

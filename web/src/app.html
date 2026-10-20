@@ -1,0 +1,300 @@
+<title>KubeAudit AI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Scan Kubernetes YAML for security misconfigurations, see each problem on its line, and download a fixed file. Runs in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a two-pane inspection desk. Manifest on the left, verdict and findings on the right; stacks on phones. */
+:root {
+  --bg: #eef1f3;
+  --panel: #fbfcfc;
+  --panel-2: #f3f6f7;
+  --ink: #12202b;
+  --ink-2: #4a5966;
+  --line: #d5dde2;
+  --accent: #0b6a86;
+  --accent-ink: #ffffff;
+  --code-bg: #f7f9fa;
+  --sel: rgba(11, 106, 134, .12);
+  --add: rgba(31, 140, 84, .13);
+  --critical: #b8231b;
+  --high: #c65a0a;
+  --medium: #8a6a00;
+  --low: #5e6d7a;
+  --pass: #1d7a4a;
+  --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1218; --panel: #111b23; --panel-2: #15212b; --ink: #dbe5ec; --ink-2: #93a4b2; --line: #24333f;
+    --accent: #3fb3d3; --accent-ink: #06141b; --code-bg: #0d161d; --sel: rgba(63, 179, 211, .16); --add: rgba(64, 196, 120, .16);
+    --critical: #ff6b5e; --high: #ff9b4a; --medium: #e4c04a; --low: #8fa0ad; --pass: #4cc98a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1218; --panel: #111b23; --panel-2: #15212b; --ink: #dbe5ec; --ink-2: #93a4b2; --line: #24333f;
+  --accent: #3fb3d3; --accent-ink: #06141b; --code-bg: #0d161d; --sel: rgba(63, 179, 211, .16); --add: rgba(64, 196, 120, .16);
+  --critical: #ff6b5e; --high: #ff9b4a; --medium: #e4c04a; --low: #8fa0ad; --pass: #4cc98a; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 32px;
+}
+code { font-family: var(--font-mono); font-size: .86em; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3em; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+
+/* header */
+.top { max-width: 1320px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-block: 18px 14px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+.brand svg { width: 30px; height: 30px; flex: none; }
+.brand b { font: 800 26px/1 var(--font-display); letter-spacing: .02em; text-transform: uppercase; }
+.brand i { font: 700 12px/1 var(--font-mono); font-style: normal; color: var(--accent); border: 1.5px solid currentColor; border-radius: 4px; padding: 3px 5px; margin-left: 2px; }
+.top nav { display: flex; gap: 18px; flex-wrap: wrap; font-weight: 600; font-size: 14px; }
+.top nav a { text-decoration: none; color: var(--ink-2); }
+.top nav a:hover { color: var(--accent); }
+.lede { max-width: 1320px; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: end; gap: 12px 24px; flex-wrap: wrap; }
+.lede h1 { margin: 0; font: 800 clamp(30px, 4.4vw, 46px)/1 var(--font-display); text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; max-width: 22ch; }
+.lede p { margin: 0; color: var(--ink-2); max-width: 46ch; }
+
+/* desk */
+.desk { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 980px) { .desk { grid-template-columns: minmax(0, 1fr); } }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+
+/* manifest pane */
+#manifest { display: flex; flex-direction: column; position: sticky; top: max(12px, env(safe-area-inset-top, 0px)); }
+@media (max-width: 980px) { #manifest { position: static; } }
+#manifest.drag { outline: 2px dashed var(--accent); outline-offset: -6px; }
+.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.bar .lbl { font: 600 12px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-right: auto; }
+.btn, select.btn { appearance: none; font: 600 13px/1 var(--font-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 8px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+select.btn { padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%), linear-gradient(135deg, var(--ink-2) 50%, transparent 50%); background-position: right 12px top 55%, right 7px top 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+#filetabs { display: flex; gap: 4px; padding: 8px 10px 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--panel-2); border-radius: 0; }
+.ftab { display: flex; align-items: center; border: 1px solid transparent; border-bottom: none; border-radius: 7px 7px 0 0; }
+.ftab.on { background: var(--panel); border-color: var(--line); margin-bottom: -1px; }
+.fname { all: unset; cursor: pointer; padding: 7px 10px; font: 500 13px/1.2 var(--font-mono); white-space: nowrap; display: inline-flex; gap: 8px; align-items: center; color: var(--ink-2); }
+.ftab.on .fname { color: var(--ink); }
+.fcount { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); }
+.fclose { all: unset; cursor: pointer; padding: 4px 8px 4px 0; color: var(--ink-2); }
+.fname:focus-visible, .fclose:focus-visible { outline: 2px solid var(--accent); }
+.editwrap { position: relative; display: flex; height: min(68vh, 760px); min-height: 360px; background: var(--code-bg); border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; }
+@media (max-width: 980px) { .editwrap { height: 52vh; min-height: 300px; } }
+.gutterbox { flex: none; width: 52px; overflow: hidden; border-right: 1px solid var(--line); position: relative; }
+#gutter { position: absolute; top: 0; left: 0; right: 0; padding-top: 12px; will-change: transform; }
+.ln { display: block; height: var(--lh); font: 400 12px/var(--lh) var(--font-mono); text-align: right; padding-right: 9px; color: var(--ink-2); opacity: .7; width: 100%; }
+button.ln { all: unset; display: block; box-sizing: border-box; width: 100%; height: var(--lh); font: 600 12px/var(--lh) var(--font-mono); text-align: right; padding-right: 9px; cursor: pointer; position: relative; opacity: 1; }
+button.ln::before { content: ""; position: absolute; left: 6px; top: 50%; width: 7px; height: 7px; border-radius: 2px; transform: translateY(-50%) rotate(45deg); background: currentColor; }
+.ln.critical { color: var(--critical); } .ln.high { color: var(--high); } .ln.medium { color: var(--medium); } .ln.low { color: var(--low); } .ln.error { color: var(--critical); }
+#editor { --lh: 20px; flex: 1; min-width: 0; resize: none; border: 0; outline: none; margin: 0; padding: 12px 14px; background: transparent; color: var(--ink); font: 400 13px/var(--lh) var(--font-mono); white-space: pre; overflow: auto; tab-size: 2; position: relative; z-index: 1; }
+.editwrap { --lh: 20px; }
+#band { position: absolute; left: 52px; right: 0; top: 0; background: var(--sel); border-left: 3px solid var(--accent); pointer-events: none; z-index: 0; }
+.hint { padding: 8px 12px; font-size: 12.5px; color: var(--ink-2); border-top: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+
+/* verdict */
+.side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#scorecard { padding: 18px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 22px; align-items: center; }
+.score { display: flex; align-items: baseline; gap: 8px; grid-row: span 2; }
+#score { font: 800 76px/.85 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.score small { font: 600 13px/1 var(--font-mono); color: var(--ink-2); }
+#grade { font: 800 30px/1 var(--font-display); padding: 2px 9px; border-radius: 6px; border: 2px solid currentColor; }
+#scorecard[data-grade="A"] #grade, #scorecard[data-grade="B"] #grade { color: var(--pass); }
+#scorecard[data-grade="C"] #grade { color: var(--medium); }
+#scorecard[data-grade="D"] #grade { color: var(--high); }
+#scorecard[data-grade="F"] #grade { color: var(--critical); }
+.meter { height: 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+#meter-fill { height: 100%; background: linear-gradient(90deg, var(--critical), var(--high) 40%, var(--medium) 65%, var(--pass)); background-size: 300px 100%; width: 0; transition: width .4s ease; }
+@media (prefers-reduced-motion: reduce) { #meter-fill { transition: none; } }
+.verdict { font: 500 13px/1.3 var(--font-mono); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.v-k { color: var(--ink-2); }
+.v-k::after { content: ":"; }
+.verdict .v-v { font-weight: 600; padding: 2px 8px; border-radius: 5px; }
+.verdict.fail .v-v { color: var(--critical); background: color-mix(in srgb, var(--critical) 12%, transparent); }
+.verdict.pass .v-v { color: var(--pass); background: color-mix(in srgb, var(--pass) 12%, transparent); }
+.verdict.warn .v-v { color: var(--high); background: color-mix(in srgb, var(--high) 12%, transparent); }
+.verdict.idle .v-v { color: var(--ink-2); }
+#chips { grid-column: 1 / -1; list-style: none; margin: 10px 0 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font-size: 13px; font-weight: 600; padding: 5px 10px 5px 8px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
+.chip .n { font: 700 14px/1 var(--font-mono); min-width: 1.4ch; text-align: right; }
+.chip.critical .n { color: var(--critical); } .chip.high .n { color: var(--high); } .chip.medium .n { color: var(--medium); } .chip.low .n { color: var(--low); }
+.chip.zero { opacity: .55; }
+.foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 6px; }
+#scanned { font-size: 13px; color: var(--ink-2); }
+
+/* tabs */
+.results { overflow: hidden; }
+.tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { all: unset; cursor: pointer; padding: 12px 12px 10px; font: 600 14px/1 var(--font-body); color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+.panel { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.panel > :empty { display: none; }
+
+/* findings */
+.res h3 { margin: 0 0 6px; font: 600 13.5px/1.3 var(--font-mono); overflow-wrap: anywhere; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.res .kind { color: var(--accent); }
+.infile { font-weight: 400; font-size: 12px; color: var(--ink-2); }
+.res ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.finding { border: 1px solid var(--line); border-left: 4px solid var(--sevc); border-radius: 8px; background: var(--panel); }
+.finding.critical { --sevc: var(--critical); } .finding.high { --sevc: var(--high); } .finding.medium { --sevc: var(--medium); } .finding.low { --sevc: var(--low); }
+.finding.sel { background: var(--sel); }
+.finding summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 70px 52px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 9px 10px; }
+.finding summary::-webkit-details-marker { display: none; }
+.sev { font: 700 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--sevc); }
+.rid { font: 600 12px/1 var(--font-mono); color: var(--ink-2); }
+.ttl { font-weight: 600; min-width: 0; }
+.lnk { all: unset; cursor: pointer; font: 600 12px/1 var(--font-mono); color: var(--accent); padding: 5px 7px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel-2); }
+.lnk:hover, .lnk:focus-visible { border-color: var(--accent); }
+@media (max-width: 520px) { .finding summary { grid-template-columns: auto auto minmax(0, 1fr); } .finding summary .ttl { grid-column: 1 / -1; grid-row: 2; } .finding summary .lnk { grid-column: 3; justify-self: end; } }
+.finding .body { padding: 0 12px 12px; font-size: 14px; }
+.finding .body p { margin: 0 0 8px; }
+.msg { color: var(--ink-2); }
+pre { margin: 0; }
+.snip { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; font: 12.5px/1.5 var(--font-mono); overflow-x: auto; margin-bottom: 8px !important; }
+.snip code { background: none; border: 0; padding: 0; font-size: inherit; }
+.meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.tag { font: 600 11.5px/1 var(--font-body); padding: 4px 8px; border-radius: 99px; border: 1px solid var(--line); }
+.tag.auto { color: var(--pass); border-color: color-mix(in srgb, var(--pass) 45%, var(--line)); }
+.tag.manual { color: var(--ink-2); }
+.notice { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.notice.err { border-color: color-mix(in srgb, var(--critical) 50%, var(--line)); }
+.linkbtn { all: unset; cursor: pointer; color: var(--accent); font-weight: 600; margin-left: 8px; text-decoration: underline; }
+.clean { border: 1px solid color-mix(in srgb, var(--pass) 45%, var(--line)); background: color-mix(in srgb, var(--pass) 8%, var(--panel)); border-radius: 8px; padding: 14px; }
+.clean strong { color: var(--pass); }
+
+/* fixed */
+.fixhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.delta { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.delta .b, .delta .a { font: 800 40px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.delta .b { color: var(--ink-2); }
+.delta .a { color: var(--pass); }
+.delta .arrow { font-size: 22px; color: var(--ink-2); }
+.delta .cap { font-size: 13px; color: var(--ink-2); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.changes summary { cursor: pointer; font-weight: 600; }
+.changes ul, .manual ul { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 3px; }
+.manual { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--panel-2); font-size: 14px; }
+.codeview { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 520px; }
+.codeview pre { font: 13px/20px var(--font-mono); padding: 10px 0; min-width: max-content; }
+.cl { display: block; padding-right: 14px; }
+.cl.add { background: var(--add); }
+.cn { display: inline-block; width: 44px; text-align: right; padding-right: 12px; color: var(--ink-2); opacity: .7; user-select: none; }
+.cl.add .cn { color: var(--pass); opacity: 1; }
+
+/* rules table */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+th { font: 600 11.5px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); }
+.pill { font: 700 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; padding: 3px 7px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.critical { color: var(--critical); } .pill.high { color: var(--high); } .pill.medium { color: var(--medium); } .pill.low { color: var(--low); }
+
+/* below the desk */
+.more { max-width: 1320px; margin: 22px auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 860px) { .more { grid-template-columns: minmax(0, 1fr); } }
+.more section { border-top: 2px solid var(--ink); padding-top: 10px; }
+.more h2 { margin: 0 0 6px; font: 800 22px/1.1 var(--font-display); text-transform: uppercase; letter-spacing: .02em; }
+.more p { margin: 0 0 8px; color: var(--ink-2); font-size: 14px; max-width: 60ch; }
+.more pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: 12.5px/1.55 var(--font-mono); overflow-x: auto; }
+footer { max-width: 1320px; margin: 22px auto 0; font-size: 13px; color: var(--ink-2); display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: space-between; }
+
+#toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); font-weight: 600; font-size: 14px; padding: 10px 16px; border-radius: 8px; z-index: 20; max-width: calc(100vw - 32px); }
+.copybuf { position: fixed; left: 16px; right: 16px; bottom: 70px; height: 120px; z-index: 21; font: 12px var(--font-mono); }
+.loading { padding: 16px; color: var(--ink-2); }
+body.ready .loading { display: none; }
+</style>
+
+<header class="top">
+  <a class="brand" href="#" aria-label="KubeAudit AI home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 28 8v8.6c0 6.4-4.9 11.3-12 12.9C8.9 27.9 4 23 4 16.6V8L16 2.5Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M10.5 16.2 14.4 20l7.3-8" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <b>KubeAudit</b><i>AI</i>
+  </a>
+  <nav aria-label="Product">
+    <a href="#how">How it works</a>
+    <a href="https://github.com/marketplace/actions/kubeaudit-ai-kubernetes-security-scan" target="_blank" rel="noopener">GitHub Action</a>
+    <a href="https://github.com/msharsha565-create/KubeAudit-Ai" target="_blank" rel="noopener">Source</a>
+  </nav>
+</header>
+
+<div class="lede">
+  <h1>Find what would get your pods hacked</h1>
+  <p>Paste or drop Kubernetes YAML. Each problem is marked on its line with a fix, and one click gives you a hardened file. Your YAML never leaves this browser.</p>
+</div>
+
+<main class="desk">
+  <section class="pane" id="manifest" aria-label="Manifest">
+    <div class="bar">
+      <span class="lbl">Manifest</span>
+      <label class="btn filebtn">Upload files<input type="file" id="upload" accept=".yaml,.yml,application/yaml,text/yaml" multiple></label>
+      <select class="btn" id="sample" aria-label="Load an example"></select>
+      <button type="button" class="btn" id="clear">Clear</button>
+    </div>
+    <div id="filetabs" role="tablist" aria-label="Files"></div>
+    <div class="editwrap">
+      <div class="gutterbox"><div id="gutter"></div></div>
+      <div id="band" hidden></div>
+      <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Kubernetes YAML"></textarea>
+    </div>
+    <div class="hint"><span>Drop .yaml files here, or paste. Scans as you type.</span><span>Marked lines have findings; click one to see it.</span></div>
+  </section>
+
+  <div class="side">
+    <section class="pane" id="scorecard" aria-live="polite">
+      <div class="score"><span id="score">–</span><small>/100</small><span id="grade"></span></div>
+      <div class="meter" aria-hidden="true"><div id="meter-fill"></div></div>
+      <div class="verdict idle" id="verdict"></div>
+      <ul id="chips" aria-label="Findings by severity"></ul>
+      <div class="foot"><span id="scanned"></span><button type="button" class="btn" id="copyreport">Copy report</button></div>
+    </section>
+
+    <section class="pane results" aria-label="Results">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="findings" aria-selected="true">Findings</button>
+        <button type="button" role="tab" data-tab="fixed" aria-selected="false">Fixed YAML</button>
+        <button type="button" role="tab" data-tab="rules" aria-selected="false">Rules</button>
+      </div>
+      <div class="panel" id="findings"><p class="loading">Loading scanner…</p></div>
+      <div class="panel" id="fixed" hidden></div>
+      <div class="panel" id="rules" hidden></div>
+    </section>
+  </div>
+</main>
+
+<div class="more" id="how">
+  <section>
+    <h2>15 rules, one standard</h2>
+    <p>Privileged containers, root users, host access, hard-coded secrets, RBAC wildcards, unpinned images and missing limits, based on the Kubernetes Pod Security Standards.</p>
+  </section>
+  <section>
+    <h2>Same engine in CI</h2>
+    <p>Add the GitHub Action and every pull request gets the same check, with a comment on the exact lines.</p>
+<pre>- uses: actions/checkout@v5
+- uses: msharsha565-create/KubeAudit-Ai@v1.1.0</pre>
+  </section>
+  <section>
+    <h2>Private by design</h2>
+    <p>Scanning and fixing run in your browser. Nothing you paste is uploaded or stored on a server. Your last files are kept only in this browser so you can pick up where you left off.</p>
+  </section>
+</div>
+
+<footer>
+  <span>KubeAudit AI · Score = 100 − 25 per critical − 10 per high − 4 per medium − 1 per low.</span>
+  <span>Fixes cover settings with one safe answer. Review resource sizes before deploying.</span>
+</footer>
+
+<div id="toast" role="status" hidden></div>
+<script type="module">/*__BUNDLE__*/</script>

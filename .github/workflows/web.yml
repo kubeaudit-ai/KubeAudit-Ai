@@ -1,0 +1,82 @@
+name: Web app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install
+        run: |
+          pip install pyyaml
+          cd web && npm ci && npx playwright-core install --with-deps chromium
+      - name: Rule text matches the Python engine
+        run: |
+          python scripts/export_rules.py
+          git diff --exit-code web/src/rules.js
+      - name: Same findings as the Python engine
+        run: |
+          python -I web/test/py_scan.py tests/fixtures > /tmp/py.json
+          node web/test/parity.mjs tests/fixtures /tmp/py.json
+      - name: Auto-fix removes fixable issues and changes nothing else
+        run: |
+          python -I web/test/py_scan.py tests/fixtures > /tmp/py.json
+          python -c "import json; d=json.load(open('/tmp/py.json')); json.dump([k for k,v in d.items() if not v.get('error') and v.get('findings')], open('/tmp/list.json','w'))"
+          node web/test/fix_corpus.mjs tests/fixtures /tmp/fixed /tmp/list.json
+          python -I web/test/py_scan.py /tmp/fixed > /tmp/py_fixed.json
+          python -I web/test/check_fixed.py /tmp/py.json /tmp/py_fixed.json tests/fixtures /tmp/fixed
+      - name: Build
+        run: cd web && npm run build
+      - name: Browser tests
+        run: cd web && node test/browser.mjs /tmp/shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: /tmp/shots
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Build
+        run: cd web && npm ci && npm run build
+      - name: Publish to GitHub Pages (keeps the Helm repo files)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages
+          git worktree add /tmp/pages origin/gh-pages
+          cp -r web/dist/site/. /tmp/pages/
+          cd /tmp/pages
+          git add -A
+          if git diff --cached --quiet; then echo "No changes to publish."; exit 0; fi
+          git commit -m "Deploy web app from ${GITHUB_SHA::7}"
+          for _ in 1 2 3; do
+            git push origin HEAD:gh-pages && exit 0
+            git fetch origin gh-pages && git rebase origin/gh-pages
+          done
+          exit 1
