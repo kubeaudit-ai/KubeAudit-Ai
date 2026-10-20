@@ -14,6 +14,7 @@ const result = await build({
   entryPoints: [path.join(here, "src/main.js")],
   bundle: true, format: "esm", minify: true, write: false, target: "es2020",
   external: ["https://*"],
+  define: { __API_URL__: JSON.stringify(process.env.KUBEAUDIT_API_URL || "https://kubeaudit-ai-production.up.railway.app") },
   legalComments: "none",
 });
 const bundle = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");

@@ -3,6 +3,7 @@ import YAML from "https://cdn.jsdelivr.net/npm/yaml@2.5.1/browser/index.js";
 import { createEngine, RULES, SEVERITY_ORDER } from "./engine.js";
 import { createFixer, isAutoFixable } from "./fixer.js";
 import { SAMPLES } from "./samples.js";
+import { initAccount } from "./account.js";
 
 const engine = createEngine(YAML);
 const fixer = createFixer(YAML, engine);
@@ -26,6 +27,7 @@ const state = {
   selected: null,     // { file, line }
   tab: "findings",
   fixed: null,        // per active file: { text, changes, error }
+  settings: null,     // Pro rule settings: { disabled: [...], severity: { id: sev } }
 };
 
 function loadStored() {
@@ -43,11 +45,21 @@ function store() {
 
 // ---------------------------------------------------------------- scanning
 
+function applySettings(findings) {
+  const st = state.settings;
+  if (!st) return findings;
+  const off = new Set(st.disabled || []);
+  const sev = st.severity || {};
+  return findings.filter((x) => !off.has(x.rule.id))
+    .map((x) => (sev[x.rule.id] && sev[x.rule.id] !== x.rule.severity ? { ...x, rule: { ...x.rule, severity: sev[x.rule.id] } } : x))
+    .sort((a, b) => SEVERITY_ORDER[b.rule.severity] - SEVERITY_ORDER[a.rule.severity] || a.line - b.line);
+}
+
 function scanFile(f) {
   if (/\{\{/.test(f.text)) return { findings: [], resources: 0, helm: true };
   try {
     const r = engine.scanText(f.text, f.name);
-    return { findings: r.findings, resources: r.resources };
+    return { findings: applySettings(r.findings), resources: r.resources };
   } catch (e) {
     return { findings: [], resources: 0, error: { message: e.message, line: e.line || 1 } };
   }
@@ -470,3 +482,22 @@ if (saved) {
   setFiles([{ name: SAMPLES[0].name, text: SAMPLES[0].text }]);
 }
 document.body.classList.add("ready");
+
+// Accounts work on the hosted site only; inside an embedded preview the API can't be reached.
+if (isTopLevel) {
+  initAccount({
+    esc, md, toast, copyText, RULES, SEV_LABEL,
+    setFiles: (files) => setFiles(files.map((f) => ({ name: f.name, text: f.text }))),
+    currentFiles: () => state.files,
+    currentResults: () => state.results,
+    setSettings: (st) => {
+      const has = st && ((st.disabled || []).length || Object.keys(st.severity || {}).length);
+      state.settings = has ? st : null;
+      $("#settings-note").hidden = !state.settings;
+      scanAll();
+    },
+  });
+} else {
+  $("#acct").hidden = true;
+  $("#savescan").hidden = true;
+}

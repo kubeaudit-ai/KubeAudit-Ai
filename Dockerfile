@@ -18,6 +18,8 @@ RUN groupadd -g 10001 appgroup && \
 # Copy installed Python packages from builder
 COPY --from=builder /root/.local /home/appuser/.local
 COPY app ./app
+COPY migrations ./migrations
+COPY alembic.ini ./alembic.ini
 
 # Set ownership and secure permissions
 RUN chown -R appuser:appgroup /app /home/appuser/.local
@@ -30,4 +32,5 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers: trust the hosting proxy for the real client IP (used for sign-in rate limits).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

@@ -216,6 +216,78 @@ footer { max-width: 1320px; margin: 22px auto 0; font-size: 13px; color: var(--i
 .copybuf { position: fixed; left: 16px; right: 16px; bottom: 70px; height: 120px; z-index: 21; font: 12px var(--font-mono); }
 .loading { padding: 16px; color: var(--ink-2); }
 body.ready .loading { display: none; }
+
+/* accounts */
+#acct { display: flex; align-items: center; }
+.acctbtn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); font-weight: 600; font-size: 14px; max-width: 260px; }
+.acctbtn:focus-visible { outline: 2px solid var(--accent); }
+.acctbtn img, .avatar { width: 28px; height: 28px; border-radius: 50%; flex: none; }
+.avatar { display: inline-grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px; }
+.avatar.big, .acct-head img { width: 44px; height: 44px; font-size: 18px; border-radius: 50%; }
+.who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pro, .plan { font: 700 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; padding: 4px 7px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); }
+.pro, .plan.pro { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.dlg { border: 1px solid var(--line); border-radius: 14px; padding: 0; background: var(--panel); color: var(--ink); width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
+.dlg.wide { width: min(760px, calc(100vw - 32px)); }
+.dlg::backdrop { background: rgba(6, 14, 20, .55); }
+.dlg-in { padding: 22px; position: relative; display: flex; flex-direction: column; gap: 14px; }
+.dlg h2 { margin: 0; font: 800 26px/1.05 var(--font-display); text-transform: uppercase; letter-spacing: .01em; padding-right: 36px; overflow-wrap: anywhere; }
+.dlg h3 { margin: 0 0 8px; font: 700 12px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.dlg p { margin: 0; }
+.x { all: unset; cursor: pointer; position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; display: grid; place-items: center; font-size: 22px; border-radius: 8px; color: var(--ink-2); }
+.x:hover, .x:focus-visible { background: var(--panel-2); outline: none; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.stack label { font-weight: 600; font-size: 13px; }
+.dlg input[type=email], .dlg input:not([type]), #save-title { font: 15px var(--font-body); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); width: 100%; }
+.dlg input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.btn.gh { justify-content: center; padding: 11px; font-size: 15px; background: var(--ink); color: var(--bg); border-color: var(--ink); text-decoration: none; }
+.dlg .btn.primary { justify-content: center; padding: 11px; font-size: 14px; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 12px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.err { color: var(--critical); font-size: 13.5px; }
+.warn-text { color: var(--high); }
+.sent { border: 1px solid color-mix(in srgb, var(--pass) 45%, var(--line)); background: color-mix(in srgb, var(--pass) 8%, var(--panel)); border-radius: 8px; padding: 12px; }
+.sent p { margin-top: 4px; }
+.acct-head { display: flex; align-items: center; gap: 12px; padding-right: 36px; flex-wrap: wrap; }
+.acct-head > div { min-width: 0; flex: 1; }
+.acct-head h2 { padding-right: 0; font: 700 20px/1.2 var(--font-body); text-transform: none; letter-spacing: 0; }
+.acard { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.acard > * { max-width: 100%; }
+.perks { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 14px; }
+.locked { color: var(--ink-2); font-size: 14px; }
+.locked::before { content: "Pro · "; font: 700 11px/1 var(--font-mono); color: var(--accent); }
+.meterline { width: 100%; display: grid; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.meterline .meter > div { height: 100%; background: var(--accent); }
+.keybox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; }
+.keybox code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 8px 10px; font-size: 12.5px; }
+.howto { width: 100%; font-size: 13px; }
+.howto summary { cursor: pointer; color: var(--ink-2); }
+.howto pre { margin-top: 8px !important; }
+.hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; width: 100%; }
+.hist li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.hscore { font: 800 26px/1 var(--font-display); text-align: center; grid-row: span 2; }
+.hmain { display: grid; min-width: 0; }
+.hmain strong { overflow-wrap: anywhere; }
+.hact { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.g-A, .g-B { color: var(--pass); } .g-C { color: var(--medium); } .g-D { color: var(--high); } .g-F { color: var(--critical); }
+.rset td, .rset th { padding: 6px; }
+.rset select { font: 13px var(--font-body); padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.acct-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13.5px; }
+.danger .linkbtn { color: var(--critical); }
+.dangerbtn { background: var(--critical); color: #fff; border-color: var(--critical); }
+.check { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.eyebrow { font: 600 12px/1.3 var(--font-mono); color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; }
+.rephead { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
+.repscore { font: 800 56px/.9 var(--font-display); }
+.repscore small { font: 600 13px var(--font-mono); color: var(--ink-2); }
+.rephead .grade { font: 800 24px/1 var(--font-display); border: 2px solid currentColor; border-radius: 6px; padding: 2px 8px; }
+.rephead .chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.repfile { font: 600 13px var(--font-mono) !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--ink) !important; margin-top: 4px !important; }
+.replist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.replist li { display: grid; grid-template-columns: 64px 48px minmax(0, 1fr); gap: 8px; border-left: 4px solid var(--sevc, var(--line)); padding: 6px 8px; background: var(--panel-2); border-radius: 6px; font-size: 14px; }
+.replist li.critical { --sevc: var(--critical); } .replist li.high { --sevc: var(--high); } .replist li.medium { --sevc: var(--medium); } .replist li.low { --sevc: var(--low); }
+@media (max-width: 520px) { .replist li { grid-template-columns: auto auto; } .replist li > span:last-child { grid-column: 1 / -1; } }
 </style>
 
 <header class="top">
@@ -228,6 +300,7 @@ body.ready .loading { display: none; }
     <a href="https://github.com/marketplace/actions/kubeaudit-ai-kubernetes-security-scan" target="_blank" rel="noopener">GitHub Action</a>
     <a href="https://github.com/msharsha565-create/KubeAudit-Ai" target="_blank" rel="noopener">Source</a>
   </nav>
+  <div id="acct"></div>
 </header>
 
 <div class="lede">
@@ -258,7 +331,8 @@ body.ready .loading { display: none; }
       <div class="meter" aria-hidden="true"><div id="meter-fill"></div></div>
       <div class="verdict idle" id="verdict"></div>
       <ul id="chips" aria-label="Findings by severity"></ul>
-      <div class="foot"><span id="scanned"></span><button type="button" class="btn" id="copyreport">Copy report</button></div>
+      <div class="foot"><span id="scanned"></span><span class="actions"><button type="button" class="btn" id="copyreport">Copy report</button><button type="button" class="btn" id="savescan">Save</button></span></div>
+      <p class="small muted" id="settings-note" hidden>Your Pro rule settings are applied.</p>
     </section>
 
     <section class="pane results" aria-label="Results">

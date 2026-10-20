@@ -21,7 +21,7 @@ jobs:
           node-version: "22"
       - name: Install
         run: |
-          pip install pyyaml
+          pip install -r requirements.txt
           cd web && npm ci && npx playwright-core install --with-deps chromium
       - name: Rule text matches the Python engine
         run: |
@@ -42,6 +42,10 @@ jobs:
         run: cd web && npm run build
       - name: Browser tests
         run: cd web && node test/browser.mjs /tmp/shots
+      - name: End-to-end accounts test (real backend + browser)
+        run: node web/test/e2e_accounts.mjs /tmp/shots
+      - name: Rebuild for production
+        run: cd web && npm run build
       - uses: actions/upload-artifact@v4
         if: always()
         with:

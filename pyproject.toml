@@ -21,6 +21,7 @@ server = [
     "httpx",
     "sqlalchemy",
     "prometheus-client",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.scripts]

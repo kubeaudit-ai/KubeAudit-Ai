@@ -21,7 +21,8 @@ if config.config_file_name is not None:
 from app.models import Base
 from app.database import engine
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", str(engine.url))
+if not config.attributes.get("connection"):
+    config.set_main_option("sqlalchemy.url", engine.url.render_as_string(hide_password=False).replace("%", "%%"))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -60,6 +61,14 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    existing = config.attributes.get("connection")
+    if existing is not None:
+        # Called from app.migrate with an open connection (holds the advisory lock).
+        context.configure(render_as_batch=True, connection=existing, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -67,7 +76,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(render_as_batch=True, 
+        context.configure(render_as_batch=True,
             connection=connection, target_metadata=target_metadata
         )
 

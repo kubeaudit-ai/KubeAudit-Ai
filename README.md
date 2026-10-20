@@ -17,6 +17,12 @@ Paste or drop Kubernetes YAML and get a security score, each problem marked on i
 
 The web app uses a JavaScript port of the same rule engine. CI checks that both engines report identical findings, and that the auto-fixer removes every fixable issue without changing anything else in the file.
 
+### Accounts and Pro
+
+Sign in with GitHub or email to get an API key. **Pro ($9/month)** adds saved scan history, shareable report links,
+custom rule settings and 2,500 API scans a month. Scanning itself always stays in your browser; an account stores
+only what you choose to save. Setup for the server: [docs/ACCOUNTS_SETUP.md](docs/ACCOUNTS_SETUP.md).
+
 ## GitHub Action
 
 Add `.github/workflows/kubeaudit.yml`:

@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import Base, engine, SessionLocal
 from app.models import User, PlanTier, AuditLog
-from app.auth import generate_api_key
+from app.auth import set_new_api_key
 
 client = TestClient(app)
 
@@ -11,15 +11,15 @@ client = TestClient(app)
 def setup_db():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    db.query(AuditLog).delete()
-    db.query(User).delete()
-    
+    db.query(AuditLog).filter(AuditLog.user.has(User.email == "ci_test@kubeaudit.local")).delete(synchronize_session=False)
+    db.query(User).filter(User.email == "ci_test@kubeaudit.local").delete()
+
     user = User(
         email="ci_test@kubeaudit.local",
-        api_key=generate_api_key(),
         subscription_tier=PlanTier.FREE,
         subscription_status="active"
     )
+    user.plain_key = set_new_api_key(user)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -56,7 +56,7 @@ spec:
         cpu: "100m"
         memory: "128Mi"
 """
-    res = client.post("/audit", json={"manifest": manifest}, headers={"X-API-Key": user.api_key})
+    res = client.post("/audit", json={"manifest": manifest}, headers={"X-API-Key": user.plain_key})
     assert res.status_code == 200
     assert res.json()["valid"] is True
 
@@ -72,6 +72,6 @@ def test_quota_exhaustion_429(setup_db):
     db.commit()
     db.close()
 
-    res = client.post("/audit", json={"manifest": "apiVersion: v1\nkind: Pod"}, headers={"X-API-Key": user.api_key})
+    res = client.post("/audit", json={"manifest": "apiVersion: v1\nkind: Pod"}, headers={"X-API-Key": user.plain_key})
     assert res.status_code == 429
-    assert "Tier limit" in res.json()["detail"]
+    assert "Monthly limit of 50" in res.json()["detail"]

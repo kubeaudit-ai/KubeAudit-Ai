@@ -1,26 +1,6 @@
 import pytest
 
-@pytest.fixture(autouse=True)
-def override_saas_auth():
-    from app.main import app
-    from app.auth import verify_quota, get_current_user
-    from app.models import User, PlanTier
-    import uuid
-
-    mock_user = User(
-        id=uuid.uuid4(),
-        email="test_audit@kubeaudit.local",
-        api_key="ka_live_mock",
-        subscription_tier=PlanTier.PRO,
-        subscription_status="active",
-        audits=[]
-    )
-    app.dependency_overrides[verify_quota] = lambda: mock_user
-    app.dependency_overrides[get_current_user] = lambda: mock_user
-    yield
-    app.dependency_overrides.pop(verify_quota, None)
-    app.dependency_overrides.pop(get_current_user, None)
-
+# Requests authenticate as the real CI test user created in conftest.py.
 from fastapi.testclient import TestClient
 from app.main import app
 import base64

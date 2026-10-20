@@ -9,8 +9,11 @@ from app.models import User, AuditLog
 from sqlalchemy.orm import Session
 
 
-from app.database import init_db
 from app.billing import router as billing_router
+from app.accounts import router as accounts_router
+from app.config import get_settings
+from app.migrate import upgrade_database
+from fastapi.middleware.cors import CORSMiddleware
 from app.auth import get_current_user, verify_quota
 from app.models import User, AuditLog
 from app.database import get_db
@@ -33,10 +36,18 @@ from app.patch_guard import ai_mutations_enabled, filter_ai_patches
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    upgrade_database()
     yield
 
-app = FastAPI(lifespan=lifespan, title="KubeAudit AI", version="1.0.0")
+app = FastAPI(lifespan=lifespan, title="KubeAudit AI", version="1.1.1")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+    max_age=600,
+)
 
 AUDIT_REQUESTS = Counter(
     "kubeaudit_requests_total",
@@ -536,6 +547,7 @@ async def mutate_admission(request: Request):
 
 # Register commercial billing routes
 app.include_router(billing_router)
+app.include_router(accounts_router)
 
 
 

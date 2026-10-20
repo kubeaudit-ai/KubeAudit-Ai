@@ -63,4 +63,6 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_users_api_key'))
 
     op.drop_table('users')
+    # Postgres keeps the enum type after the table is dropped.
+    sa.Enum(name='plantier').drop(op.get_bind(), checkfirst=True)
     # ### end Alembic commands ###
