@@ -20,6 +20,8 @@ jobs:
         uses: ./
         with:
           path: tests/fixtures/repo/k8s/insecure.yaml tests/fixtures/repo/charts
+          # The repo-level .kubeaudit.yaml excludes test fixtures; use the fixtures' own config.
+          config: tests/fixtures/repo/.kubeaudit.yaml
           fail-on: none
           comment: "false"
           sarif: "false"
@@ -38,6 +40,7 @@ jobs:
         uses: ./
         with:
           path: tests/fixtures/repo/k8s/secure.yaml
+          config: tests/fixtures/repo/.kubeaudit.yaml
           comment: "false"
           sarif: "false"
 

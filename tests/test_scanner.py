@@ -208,3 +208,13 @@ def test_missing_helm_is_a_warning_not_a_crash(monkeypatch):
     monkeypatch.setenv("PATH", "/nonexistent")
     result = scan(["charts"], FIXTURE, Config())
     assert result.findings == [] and any("helm not found" in w for w in result.warnings)
+
+
+def test_explicit_path_excluded_by_config_warns(tmp_path):
+    (tmp_path / "skip").mkdir()
+    (tmp_path / "skip" / "pod.yaml").write_text(
+        "apiVersion: v1\nkind: Pod\nmetadata: {name: p}\nspec:\n  containers:\n    - {name: c, image: c}\n")
+    cfg = Config(exclude=["skip/*"])
+    result = scan(["skip/pod.yaml"], tmp_path, cfg)
+    assert result.findings == []
+    assert any("excluded by the `exclude` setting" in w for w in result.warnings)

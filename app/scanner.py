@@ -136,7 +136,8 @@ def _owning_chart(p: Path, root: Path) -> Optional[Path]:
     return None
 
 
-def discover(paths: List[str], root: Path, cfg: Config) -> Tuple[List[Path], List[Path]]:
+def discover(paths: List[str], root: Path, cfg: Config,
+             warnings: Optional[List[str]] = None) -> Tuple[List[Path], List[Path]]:
     """Return (plain YAML files, Helm chart directories)."""
     files: List[Path] = []
     charts: List[Path] = []
@@ -164,6 +165,12 @@ def discover(paths: List[str], root: Path, cfg: Config) -> Tuple[List[Path], Lis
 
     def keep(x: Path) -> bool:
         return not _excluded(_rel(x, root), cfg.exclude)
+
+    if warnings is not None:
+        for raw in paths:
+            p = Path(raw) if Path(raw).is_absolute() else root / raw
+            if p.exists() and not keep(p):
+                warnings.append(f"{_rel(p, root)}: excluded by the `exclude` setting in your config, not scanned")
 
     # drop raw files that live inside a chart dir we will render
     chart_set = [c.resolve() for c in charts]
@@ -229,9 +236,9 @@ def _split_helm(output: str) -> List[Tuple[str, str]]:
 
 
 def scan(paths: List[str], root: Path, cfg: Config) -> ScanResult:
-    files, charts = discover(paths or ["."], root, cfg)
     findings: List[Located] = []
     warnings: List[str] = []
+    files, charts = discover(paths or ["."], root, cfg, warnings)
     resources = 0
 
     for f in files:
