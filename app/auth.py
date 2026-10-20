@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import Header, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, PlanTier
+from app.models import User, PlanTier, AuditLog
 
 TIER_LIMITS = {
     PlanTier.FREE: 50,
@@ -21,14 +21,10 @@ def get_current_user(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
 ) -> User:
-    # Allow test client or default fallback if explicitly set or in test mode
     if not x_api_key:
-        test_user = db.query(User).filter(User.email == "test_audit@kubeaudit.local").first()
-        if test_user:
-            return test_user
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{"type": "missing", "loc": ["header", "X-API-Key"], "msg": "Field required", "input": None}]
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-API-Key header",
         )
 
     user = db.query(User).filter(User.api_key == x_api_key).first()
@@ -45,9 +41,9 @@ def get_current_user(
     return user
 
 
-def verify_quota(user: User = Depends(get_current_user)) -> User:
+def verify_quota(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
     limit = TIER_LIMITS.get(user.subscription_tier, 50)
-    current_count = len(user.audits)
+    current_count = db.query(AuditLog).filter(AuditLog.user_id == user.id).count()
     if current_count >= limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

@@ -27,6 +27,7 @@ import yaml
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 from app.policy_engine import policy_engine
+from app.patch_guard import ai_mutations_enabled, filter_ai_patches
 
 
 @asynccontextmanager
@@ -519,15 +520,14 @@ async def mutate_admission(request: Request):
     elif kind == "Pod":
         patches.extend(generate_pod_spec_patches(spec, "/spec"))
 
-    # AI Mutation Enrichment
-    try:
-        ai_report = await ai_advisor.audit_manifest(object_spec)
-        for patch_op in ai_report.suggested_patches:
-            patch_dict = patch_op.model_dump(exclude_none=True)
-            if patch_dict not in patches:
-                patches.append(patch_dict)
-    except Exception as e:
-        logger.warning(f"AI mutation enrichment error: {e}")
+    # AI Mutation Enrichment (opt-in; every suggestion passes the patch guard)
+    if ai_mutations_enabled():
+        try:
+            ai_report = await ai_advisor.audit_manifest(object_spec)
+            suggested = [p.model_dump(exclude_none=True) for p in ai_report.suggested_patches]
+            patches.extend(filter_ai_patches(object_spec, suggested, patches))
+        except Exception as e:
+            logger.warning(f"AI mutation enrichment error: {e}")
 
     response: Dict[str, Any] = {"uid": uid, "allowed": True}
 

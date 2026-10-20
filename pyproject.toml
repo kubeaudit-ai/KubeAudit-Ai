@@ -4,18 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kubeaudit-ai"
-version = "0.2.0"
-description = "Kubernetes security auditing and admission webhook engine"
+version = "0.5.0"
+description = "Kubernetes manifest and Helm chart security scanner, GitHub Action, and admission webhook"
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
+requires-python = ">=3.10"
+# The scanner and CLI only need PyYAML. Server/webhook dependencies are an extra.
+dependencies = ["pyyaml>=6.0"]
+
+[project.optional-dependencies]
+server = [
     "alembic>=1.13.0",
     "stripe>=7.0.0",
     "fastapi",
     "uvicorn",
-    "pyyaml",
     "pydantic",
-    "prometheus-client"
+    "httpx",
+    "sqlalchemy",
+    "prometheus-client",
 ]
 
 [project.scripts]

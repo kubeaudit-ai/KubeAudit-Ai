@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 import base64
 import json
-client = TestClient(app)
+client = TestClient(app, headers={"X-API-Key": "ka_live_mock_ci_test_key"})
 
 def test_health():
     response = client.get("/health")

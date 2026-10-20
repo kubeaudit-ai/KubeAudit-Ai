@@ -214,7 +214,64 @@ def run_advise(args):
         sys.exit(1)
 
 
-def main():
+def run_scan(args) -> int:
+    from app.scanner import Config, scan
+    from app import reporters
+
+    root = Path(args.root).resolve()
+    cfg = Config.load(root, args.config)
+    if args.fail_on:
+        cfg.fail_on = args.fail_on
+    if args.min_severity:
+        cfg.min_severity = args.min_severity
+    if args.ignore:
+        cfg.ignore += [r.strip().upper() for r in args.ignore.split(",") if r.strip()]
+
+    paths = list(args.paths)
+    if args.files_from:
+        src = sys.stdin if args.files_from == "-" else open(args.files_from)
+        with src:
+            paths += [ln.strip() for ln in src if ln.strip()]
+    if args.files_from and not paths:
+        from app.scanner import ScanResult
+        print("No files to scan.")
+        result = ScanResult([], 0, 0, [])
+    else:
+        result = scan(paths or ["."], root, cfg)
+
+    def render(fmt: str) -> str:
+        if fmt == "markdown":
+            return reporters.to_markdown(result, link_base=args.link_base, fail_on=cfg.fail_on)
+        if fmt == "text":
+            return reporters.to_text(result, color=sys.stdout.isatty() and not args.output)
+        return reporters.FORMATS[fmt](result)
+
+    text = render(args.format)
+    if args.files_from and not paths:
+        text = ""
+    if args.output:
+        Path(args.output).write_text(text + "\n")
+    elif text:
+        print(text)
+    for fmt, dest in (("sarif", args.sarif), ("markdown", args.markdown), ("json", args.json)):
+        if dest:
+            Path(dest).write_text(render(fmt) + "\n")
+
+    if result.failed(cfg.fail_on):
+        if args.format == "text" and not args.output:
+            print(f"\nFailing: found issues at or above '{cfg.fail_on}' severity.")
+        return 1
+    return 0
+
+
+def run_rules(args) -> int:
+    from app.rules import RULES
+    for r in RULES.values():
+        print(f"{r.id}  {r.severity.upper():8} {r.name:30} {r.title}")
+    return 0
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="kubeaudit",
         description="KubeAudit AI manifest security scanner and auto-fixer"
@@ -234,7 +291,28 @@ def main():
     p_advise.add_argument("--host", default="https://kubeaudit-ai-production.up.railway.app", help="KubeAudit API base URL")
     p_advise.set_defaults(func=run_advise)
 
-    args = parser.parse_args()
+    p_scan = subparsers.add_parser("scan", help="Scan files, directories and Helm charts offline (no server needed)")
+    p_scan.add_argument("paths", nargs="*", help="Files or directories to scan (default: current directory)")
+    p_scan.add_argument("--format", "-f", choices=["text", "json", "sarif", "markdown"], default="text")
+    p_scan.add_argument("--output", "-o", help="Write the main report to this file instead of stdout")
+    p_scan.add_argument("--sarif", help="Also write a SARIF report to this path")
+    p_scan.add_argument("--markdown", help="Also write a Markdown (PR comment) report to this path")
+    p_scan.add_argument("--json", help="Also write a JSON report to this path")
+    p_scan.add_argument("--fail-on", choices=["critical", "high", "medium", "low", "none"],
+                        help="Exit 1 when a finding at or above this severity exists (default: high)")
+    p_scan.add_argument("--min-severity", choices=["critical", "high", "medium", "low"],
+                        help="Hide findings below this severity (default: low)")
+    p_scan.add_argument("--ignore", help="Comma-separated rule IDs or names to skip")
+    p_scan.add_argument("--config", help="Path to config file (default: .kubeaudit.yaml in --root)")
+    p_scan.add_argument("--root", default=".", help="Repository root; report paths are relative to it")
+    p_scan.add_argument("--files-from", help="Read extra paths (one per line) from this file, or '-' for stdin")
+    p_scan.add_argument("--link-base", help="URL prefix for file links in Markdown, e.g. https://github.com/o/r/blob/<sha>")
+    p_scan.set_defaults(func=run_scan)
+
+    p_rules = subparsers.add_parser("rules", help="List all rules")
+    p_rules.set_defaults(func=run_rules)
+
+    args = parser.parse_args(argv)
     if hasattr(args, "func"):
         res = args.func(args)
         return res if res is not None else 0

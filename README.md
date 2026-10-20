@@ -1,6 +1,108 @@
 # KubeAudit AI
 
-KubeAudit AI is an automated Kubernetes manifest security auditor and admission webhook engine built with FastAPI, cert-manager, and Helm. It inspects resource manifests for security misconfigurations, auto-remediates insecure workloads via RFC 6902 JSON Patches, and enforces admission compliance directly within the cluster.
+**Catch Kubernetes security misconfigurations in pull requests, before they reach a cluster.**
+
+KubeAudit AI scans Kubernetes YAML and Helm charts, points to the exact line of each problem, and shows the fix. It runs as a GitHub Action, a CLI, or an in-cluster admission webhook.
+
+- 🔍 15 rules covering privileged containers, root users, host access, hard-coded secrets, RBAC wildcards, unpinned images, and resource limits
+- 📍 Line-accurate findings in PR comments and in GitHub code scanning (SARIF)
+- ⛵ Helm charts are rendered with `helm template` before scanning, so templated values are checked too
+- 🧩 Works offline. The scanner needs only Python and PyYAML, and no code leaves your runner
+
+## GitHub Action
+
+Add `.github/workflows/kubeaudit.yml`:
+
+```yaml
+name: KubeAudit
+on: [pull_request]
+
+permissions:
+  contents: read
+  pull-requests: write     # PR comment
+  security-events: write   # code scanning upload
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msharsha565-create/KubeAudit-Ai@v0.5.0
+        with:
+          fail-on: high        # critical | high | medium | low | none
+          only-changed: true   # scan just the files this PR touches
+```
+
+| Input | Default | Description |
+|---|---|---|
+| `path` | `.` | Files or directories to scan, space-separated |
+| `only-changed` | `false` | On PRs, scan only changed files (and the Helm charts they belong to) |
+| `fail-on` | `high` | Fail the check at or above this severity |
+| `min-severity` | `low` | Hide findings below this severity |
+| `ignore` | | Comma-separated rule IDs to skip |
+| `comment` | `true` | Post or update one summary comment on the PR |
+| `sarif` | `true` | Upload to code scanning (private repos need GitHub Advanced Security) |
+| `setup-helm` | `true` | Install Helm to render charts |
+
+Outputs: `findings`, `critical`, `high`, `sarif-file`, `report-file`.
+
+## CLI
+
+```bash
+pip install "git+https://github.com/msharsha565-create/KubeAudit-Ai"
+kubeaudit scan .                       # human-readable, exit 1 on high+ findings
+kubeaudit scan k8s/ --format sarif -o results.sarif
+kubeaudit scan . --fail-on critical --ignore KA014,KA015
+kubeaudit rules                        # list all rules
+```
+
+## Rules
+
+| ID | Severity | Name | Checks for |
+|---|---|---|---|
+| KA001 | Critical | PrivilegedContainer | Container runs in privileged mode |
+| KA002 | High | AllowPrivilegeEscalation | Container allows privilege escalation |
+| KA003 | High | RunAsNonRoot | Container may run as root |
+| KA004 | High | HostNamespaces | Pod shares host namespaces |
+| KA005 | High | HostPathVolume | Pod mounts a hostPath volume |
+| KA006 | High | DangerousCapabilities | Container adds dangerous Linux capabilities |
+| KA007 | High | HardcodedSecretEnv | Secret value hard-coded in an environment variable |
+| KA008 | High | RBACWildcard | RBAC rule grants wildcard access |
+| KA009 | Medium | ImageNotPinned | Image uses latest or no tag |
+| KA010 | Medium | ReadOnlyRootFilesystem | Root filesystem is writable |
+| KA011 | Medium | MissingMemoryLimit | Container has no memory limit |
+| KA012 | Low | DropAllCapabilities | Container does not drop all capabilities |
+| KA013 | Low | MissingResourceRequests | Container has no CPU or memory requests |
+| KA014 | Low | MissingProbes | Long-running container has no readiness or liveness probe |
+| KA015 | Low | AutomountServiceAccountToken | Service account token is mounted automatically |
+
+Workloads checked: Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, including init and ephemeral containers. RBAC checks cover Role and ClusterRole.
+
+## Configuration
+
+Put `.kubeaudit.yaml` in the repo root:
+
+```yaml
+fail_on: high
+min_severity: low
+ignore: [KA015]                 # rule IDs or names
+exclude: ["examples/*", "test/fixtures/*"]
+helm:
+  values:
+    charts/my-app: [values-prod.yaml]   # values files per chart
+```
+
+Skip rules on one resource with an annotation:
+
+```yaml
+metadata:
+  annotations:
+    kubeaudit.ai/ignore: "KA004,KA005"   # or "all"
+```
+
+## In-cluster admission webhook
+
+The same project also ships a validating and mutating admission webhook. The sections below cover deploying it.
 
 ---
 

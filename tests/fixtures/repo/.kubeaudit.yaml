@@ -1,0 +1,3 @@
+ignore: [KA015]
+exclude: ["k8s/ignored/*"]
+fail_on: high

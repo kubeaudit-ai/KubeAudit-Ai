@@ -1,0 +1,4 @@
+name: some github workflow or compose file
+services:
+  web:
+    image: nginx

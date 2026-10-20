@@ -1,0 +1,173 @@
+name: "KubeAudit AI - Kubernetes Security Scan"
+description: "Scan Kubernetes YAML and Helm charts in pull requests. Comments fixes on the PR and uploads results to GitHub code scanning."
+author: "Sai Harsha Vardhan Mylavarapu"
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  path:
+    description: "Files or directories to scan, space-separated."
+    default: "."
+  only-changed:
+    description: "On pull requests, scan only files the PR changes (plus any Helm chart they belong to)."
+    default: "false"
+  fail-on:
+    description: "Fail the check when a finding at or above this severity exists: critical, high, medium, low, none."
+    default: "high"
+  min-severity:
+    description: "Hide findings below this severity: critical, high, medium, low."
+    default: "low"
+  ignore:
+    description: "Comma-separated rule IDs or names to skip, e.g. KA014,KA015."
+    default: ""
+  config:
+    description: "Path to a .kubeaudit.yaml config file. Defaults to the one in the repo root, if any."
+    default: ""
+  comment:
+    description: "Post or update a summary comment on the pull request."
+    default: "true"
+  sarif:
+    description: "Upload results to GitHub code scanning (needs `security-events: write`; private repos need GitHub Advanced Security)."
+    default: "true"
+  setup-helm:
+    description: "Install Helm so charts can be rendered. Set to false if Helm is already on the runner."
+    default: "true"
+  github-token:
+    description: "Token used to read PR files and write the comment."
+    default: ${{ github.token }}
+
+outputs:
+  findings:
+    description: "Total number of findings."
+    value: ${{ steps.scan.outputs.findings }}
+  critical:
+    description: "Number of critical findings."
+    value: ${{ steps.scan.outputs.critical }}
+  high:
+    description: "Number of high findings."
+    value: ${{ steps.scan.outputs.high }}
+  sarif-file:
+    description: "Path to the SARIF report."
+    value: ${{ steps.scan.outputs.sarif }}
+  report-file:
+    description: "Path to the Markdown report."
+    value: ${{ steps.scan.outputs.markdown }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install KubeAudit AI
+      shell: bash
+      run: python -m pip install --quiet --disable-pip-version-check "${{ github.action_path }}"
+
+    - name: Set up Helm
+      if: inputs.setup-helm == 'true'
+      uses: azure/setup-helm@v4
+
+    - name: List changed files
+      id: changed
+      if: inputs.only-changed == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        out="$RUNNER_TEMP/kubeaudit-changed.txt"
+        gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --paginate \
+          --jq '.[] | select(.status != "removed") | .filename' > "$out"
+        echo "Changed files: $(wc -l < "$out")"
+        echo "file=$out" >> "$GITHUB_OUTPUT"
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        KA_PATHS: ${{ inputs.path }}
+        KA_FAIL_ON: ${{ inputs.fail-on }}
+        KA_MIN_SEV: ${{ inputs.min-severity }}
+        KA_IGNORE: ${{ inputs.ignore }}
+        KA_CONFIG: ${{ inputs.config }}
+        KA_CHANGED: ${{ steps.changed.outputs.file }}
+        KA_LINK_BASE: ${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha || github.sha }}
+      run: |
+        set +e
+        sarif="$RUNNER_TEMP/kubeaudit.sarif"
+        md="$RUNNER_TEMP/kubeaudit.md"
+        json="$RUNNER_TEMP/kubeaudit.json"
+        args=(scan --root "$GITHUB_WORKSPACE" --fail-on "$KA_FAIL_ON" --min-severity "$KA_MIN_SEV"
+              --sarif "$sarif" --markdown "$md" --json "$json" --link-base "$KA_LINK_BASE")
+        [ -n "$KA_IGNORE" ] && args+=(--ignore "$KA_IGNORE")
+        [ -n "$KA_CONFIG" ] && args+=(--config "$KA_CONFIG")
+        if [ -n "$KA_CHANGED" ]; then
+          args+=(--files-from "$KA_CHANGED")
+        else
+          read -r -a paths <<< "$KA_PATHS"
+          args+=("${paths[@]}")
+        fi
+        kubeaudit "${args[@]}"
+        code=$?
+        if [ ! -f "$json" ]; then
+          echo "::error::KubeAudit did not produce a report (exit $code)."
+          exit 2
+        fi
+        python - "$json" >> "$GITHUB_OUTPUT" <<'PY'
+        import json, sys
+        s = json.load(open(sys.argv[1]))["summary"]
+        print(f"findings={s['findings']}\ncritical={s['critical']}\nhigh={s['high']}")
+        PY
+        echo "sarif=$sarif" >> "$GITHUB_OUTPUT"
+        echo "markdown=$md" >> "$GITHUB_OUTPUT"
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+        cat "$md" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload to code scanning
+      if: inputs.sarif == 'true'
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif }}
+        category: kubeaudit-ai
+
+    - name: Comment on pull request
+      if: inputs.comment == 'true' && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target')
+      continue-on-error: true
+      uses: actions/github-script@v7
+      env:
+        REPORT: ${{ steps.scan.outputs.markdown }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- kubeaudit-ai-report -->';
+          let body = fs.readFileSync(process.env.REPORT, 'utf8');
+          if (body.length > 65000) body = body.slice(0, 64000) + '\n\n_Report truncated; see the job summary._';
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+          const mine = comments.find(c => c.body && c.body.startsWith(marker));
+          try {
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+          } catch (e) {
+            core.warning(`Could not comment on the PR (fork PRs get a read-only token): ${e.message}`);
+          }
+
+    - name: Set result
+      shell: bash
+      env:
+        CODE: ${{ steps.scan.outputs.exit_code }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        if [ "$CODE" = "1" ]; then
+          echo "::error::KubeAudit found issues at or above '$FAIL_ON' severity. See the PR comment or job summary."
+          exit 1
+        fi
+        exit "${CODE:-0}"

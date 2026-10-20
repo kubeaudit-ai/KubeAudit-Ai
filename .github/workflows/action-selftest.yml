@@ -1,0 +1,52 @@
+name: Action self-test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  insecure-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run action on insecure manifests
+        id: ka
+        uses: ./
+        with:
+          path: tests/fixtures/repo/k8s/insecure.yaml tests/fixtures/repo/charts
+          fail-on: none
+          comment: "false"
+          sarif: "false"
+      - name: Expect findings
+        run: |
+          echo "findings=${{ steps.ka.outputs.findings }} critical=${{ steps.ka.outputs.critical }}"
+          test "${{ steps.ka.outputs.critical }}" -ge 1
+          test "${{ steps.ka.outputs.findings }}" -ge 15
+          grep -q "charts/web/templates/deployment.yaml" "${{ steps.ka.outputs.report-file }}"
+
+  secure-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run action on secure manifests (must pass)
+        uses: ./
+        with:
+          path: tests/fixtures/repo/k8s/secure.yaml
+          comment: "false"
+          sarif: "false"
+
+  this-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan this repo's own manifests and chart
+        uses: ./
+        with:
+          path: manifests charts deploy
+          fail-on: none

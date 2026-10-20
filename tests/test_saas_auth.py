@@ -28,7 +28,7 @@ def setup_db():
 
 def test_missing_api_key_rejected():
     res = client.post("/audit", json={"manifest": "apiVersion: v1\nkind: Pod"})
-    assert res.status_code == 422
+    assert res.status_code == 401
 
 def test_authenticated_audit_and_logging(setup_db):
     user = setup_db
