@@ -27,6 +27,7 @@ import yaml
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 from app.policy_engine import policy_engine
+from app.images import is_unpinned_image
 
 
 @asynccontextmanager
@@ -81,7 +82,7 @@ class FixResponse(BaseModel):
     remediated_manifest: str
     applied_fixes: List[str]
 
-from app.ai_advisor import ai_advisor
+from app.ai_advisor import ai_advisor, guard_ai_patches, AI_PATCHES_ENABLED
 
 class AdviseRequest(BaseModel):
     manifest: str
@@ -119,7 +120,7 @@ def inspect_container_list(containers: List[Dict[str, Any]], container_type: str
         c_name = container.get("name", "unnamed")
         image = container.get("image", "")
 
-        if ":" not in image or image.endswith(":latest"):
+        if is_unpinned_image(image):
             issues.append(Issue(
                 severity="Medium",
                 rule="AvoidLatestTag",
@@ -211,13 +212,6 @@ def analyze_manifest(doc: Dict[str, Any]) -> List[Issue]:
 
 def patch_container(container: Dict[str, Any], fixes: List[str]):
     c_name = container.get("name", "unnamed")
-    image = container.get("image", "")
-    if ":" not in image or image.endswith(":latest"):
-        base_image = image.split(":")[0] if ":" in image else image
-        fallback_image = f"{base_image}:alpine" if base_image == "nginx" else f"{base_image}:1.0.0"
-        container["image"] = fallback_image
-        fixes.append(f"Pinned image for container '{c_name}' from '{image}' to '{fallback_image}'")
-
     sec_ctx = container.setdefault("securityContext", {})
     if sec_ctx.get("privileged", False):
         sec_ctx["privileged"] = False
@@ -294,17 +288,6 @@ def generate_pod_spec_patches(pod_spec: Dict[str, Any], path_prefix: str) -> Lis
     containers = pod_spec.get("containers", [])
     for idx, container in enumerate(containers):
         c_prefix = f"{path_prefix}/containers/{idx}"
-        image = container.get("image", "")
-
-        if ":" not in image or image.endswith(":latest"):
-            base_image = image.split(":")[0] if ":" in image else image
-            fallback_image = f"{base_image}:alpine" if base_image == "nginx" else f"{base_image}:1.0.0"
-            patches.append({
-                "op": "replace" if "image" in container else "add",
-                "path": f"{c_prefix}/image",
-                "value": fallback_image
-            })
-
         c_sec = container.get("securityContext")
         if c_sec is None:
             patches.append({
@@ -519,15 +502,19 @@ async def mutate_admission(request: Request):
     elif kind == "Pod":
         patches.extend(generate_pod_spec_patches(spec, "/spec"))
 
-    # AI Mutation Enrichment
-    try:
-        ai_report = await ai_advisor.audit_manifest(object_spec)
-        for patch_op in ai_report.suggested_patches:
-            patch_dict = patch_op.model_dump(exclude_none=True)
-            if patch_dict not in patches:
-                patches.append(patch_dict)
-    except Exception as e:
-        logger.warning(f"AI mutation enrichment error: {e}")
+    # AI Mutation Enrichment (opt-in; model output passes a strict allow-list)
+    if AI_PATCHES_ENABLED:
+        pod_spec_path = "/spec/template/spec" if kind in ["Deployment", "StatefulSet", "DaemonSet", "Job"] else "/spec"
+        pod_spec_obj = spec.get("template", {}).get("spec", {}) if pod_spec_path != "/spec" else spec
+        if kind in ["Deployment", "StatefulSet", "DaemonSet", "Job", "Pod"]:
+            try:
+                ai_report = await ai_advisor.audit_manifest(object_spec)
+                containers = pod_spec_obj.get("containers", [])
+                for patch_dict in guard_ai_patches(ai_report.suggested_patches, pod_spec_path, containers):
+                    if patch_dict not in patches:
+                        patches.append(patch_dict)
+            except Exception as e:
+                logger.warning(f"AI mutation enrichment error: {e}")
 
     response: Dict[str, Any] = {"uid": uid, "allowed": True}
 

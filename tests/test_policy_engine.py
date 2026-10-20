@@ -1,7 +1,7 @@
 import pytest
 from app.policy_engine import policy_engine
 
-def test_rego_evaluates_insecure_deployment():
+def test_policy_engine_evaluates_insecure_deployment():
     insecure = {
         "kind": "Deployment",
         "spec": {
@@ -25,7 +25,7 @@ def test_rego_evaluates_insecure_deployment():
     assert "PrivilegedContainer" in rules
     assert "MissingResourceLimits" in rules
 
-def test_rego_evaluates_compliant_deployment():
+def test_policy_engine_evaluates_compliant_deployment():
     compliant = {
         "kind": "Deployment",
         "spec": {

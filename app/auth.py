@@ -21,14 +21,10 @@ def get_current_user(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
 ) -> User:
-    # Allow test client or default fallback if explicitly set or in test mode
     if not x_api_key:
-        test_user = db.query(User).filter(User.email == "test_audit@kubeaudit.local").first()
-        if test_user:
-            return test_user
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{"type": "missing", "loc": ["header", "X-API-Key"], "msg": "Field required", "input": None}]
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-API-Key header"
         )
 
     user = db.query(User).filter(User.api_key == x_api_key).first()

@@ -156,3 +156,45 @@ class AIAdvisor:
 
 
 ai_advisor = AIAdvisor()
+
+
+AI_PATCHES_ENABLED = os.getenv("KUBEAUDIT_AI_PATCHES", "false").lower() == "true"
+
+# Only these exact values may be written by model-suggested patches; each one
+# can only tighten security.
+_ALLOWED_CONTAINER_FIELDS = {
+    "privileged": False,
+    "readOnlyRootFilesystem": True,
+    "allowPrivilegeEscalation": False,
+    "runAsNonRoot": True,
+}
+
+
+def guard_ai_patches(patches: List[JSONPatchOp], pod_spec_path: str, containers: List[Any]) -> List[Dict[str, Any]]:
+    """Return only the model-suggested patches that pass a strict allow-list.
+
+    Allowed: add/replace of a container securityContext field listed in
+    _ALLOWED_CONTAINER_FIELDS with its hardened value, on a container index that
+    exists. Everything else (other paths, remove ops, other values) is dropped.
+    """
+    allowed: List[Dict[str, Any]] = []
+    for patch in patches:
+        if patch.op not in ("add", "replace"):
+            continue
+        parts = patch.path.split("/")
+        # ['', 'spec', ..., 'containers', '<idx>', 'securityContext', '<field>']
+        prefix = pod_spec_path + "/containers/"
+        if not patch.path.startswith(prefix) or len(parts) != len(pod_spec_path.split("/")) + 4:
+            continue
+        idx, sec, field = parts[-3], parts[-2], parts[-1]
+        if sec != "securityContext" or not idx.isdigit() or int(idx) >= len(containers):
+            continue
+        if field not in _ALLOWED_CONTAINER_FIELDS:
+            continue
+        if patch.value is not _ALLOWED_CONTAINER_FIELDS[field]:
+            continue
+        # JSON Patch "add" under a missing securityContext would be invalid.
+        if not isinstance(containers[int(idx)], dict) or not isinstance(containers[int(idx)].get("securityContext"), dict):
+            continue
+        allowed.append(patch.model_dump(exclude_none=True))
+    return allowed

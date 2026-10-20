@@ -6,6 +6,7 @@ import json
 import urllib.request
 import urllib.error
 
+from app.images import is_unpinned_image
 from app.policy_engine import policy_engine
 
 
@@ -46,7 +47,7 @@ def remediate_document(doc: dict, all_fixes: list = None):
 
             # Pin image tag
             image = c.get("image", "")
-            if image.endswith(":latest") or ":" not in image:
+            if is_unpinned_image(image):
                 base = image.split(":")[0]
                 c["image"] = f"{base}:pinned"
                 all_fixes.append(f"Pinned image for container '{name}'")
