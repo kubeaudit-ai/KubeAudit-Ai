@@ -3,6 +3,16 @@ entries:
   kubeaudit-ai:
   - apiVersion: v2
     appVersion: 0.4.2
+    created: "2026-10-20T03:19:33.979317887Z"
+    description: KubeAudit AI Admission Controller & Policy Enforcement Engine
+    digest: 3d12cea1b0924cc089608bb6b3f02b2b9f953e4e6aa4f3cc073b2b9cc0b69878
+    name: kubeaudit-ai
+    type: application
+    urls:
+    - kubeaudit-ai-0.4.6.tgz
+    version: 0.4.6
+  - apiVersion: v2
+    appVersion: 0.4.2
     created: "2026-10-20T03:14:53.212746493Z"
     description: KubeAudit AI Admission Controller & Policy Enforcement Engine
     digest: 80e56ad98fffc445132578cebb83a83208874e8a21f2e93880eeb923840adbb8
@@ -71,4 +81,4 @@ entries:
     urls:
     - https://msharsha565-create.github.io/KubeAudit-Ai/kubeaudit-ai-0.3.0.tgz
     version: 0.3.0
-generated: "2026-10-20T03:14:53.212770349Z"
+generated: "2026-10-20T03:19:33.979358383Z"
