@@ -18,3 +18,28 @@ image:
 
 tls:
   autoGenerate: true
+
+# SQLite lives on a writable emptyDir because the root filesystem is read-only.
+# Point this at Postgres for anything beyond a single replica.
+databaseUrl: "sqlite:////data/kubeaudit.db"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

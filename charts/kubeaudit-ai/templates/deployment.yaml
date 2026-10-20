@@ -16,6 +16,9 @@ spec:
       labels:
         app: {{ include "kubeaudit-ai.name" . }}
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -31,13 +34,43 @@ spec:
             - /etc/webhook/certs/tls.key
             - --ssl-certfile
             - /etc/webhook/certs/tls.crt
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.databaseUrl | quote }}
           ports:
             - containerPort: 8443
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: certs
               mountPath: /etc/webhook/certs
               readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: certs
           secret:
             secretName: {{ include "kubeaudit-ai.fullname" . }}-tls
+        # The root filesystem is read-only; these are the only writable paths.
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

@@ -13,13 +13,20 @@ spec:
       labels:
         app: demo-api
     spec:
+      automountServiceAccountToken: false
       containers:
       - name: demo-web
         image: nginx:alpine
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
         securityContext:
           privileged: false
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         resources:
           limits:
             cpu: 500m

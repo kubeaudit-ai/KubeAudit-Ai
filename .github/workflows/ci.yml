@@ -53,8 +53,23 @@ jobs:
         run: |
           helm install kubeaudit charts/kubeaudit-ai/ \
             --namespace kubeaudit \
-            --create-namespace
+            --create-namespace \
+            --set image.repository=kubeaudit-ai \
+            --set image.tag=latest \
+            --set image.pullPolicy=Never
           kubectl get mutatingwebhookconfiguration -l app.kubernetes.io/name=kubeaudit-ai
           kubectl get validatingwebhookconfiguration -l app.kubernetes.io/name=kubeaudit-ai
+      - name: Wait for webhook pod to become ready
+        run: |
+          if ! kubectl rollout status deployment/kubeaudit-kubeaudit-ai -n kubeaudit --timeout=180s; then
+            kubectl get pods -n kubeaudit -o wide
+            kubectl describe pods -n kubeaudit
+            kubectl logs -n kubeaudit -l app=kubeaudit-ai --tail=100 || true
+            exit 1
+          fi
+
+      - name: Scan this repository with KubeAudit (dogfooding)
+        run: kubeaudit scan . --fail-on high
+
       - name: Execute In-Cluster Helm Test
         run: helm test kubeaudit -n kubeaudit --timeout=60s

@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeaudit-ai
 description: KubeAudit AI Admission Controller & Policy Enforcement Engine
 type: application
-version: 0.4.7
+version: 0.4.8
 appVersion: "0.4.2"
 
 

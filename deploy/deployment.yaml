@@ -8,6 +8,9 @@ kind: Deployment
 metadata:
   name: kubeaudit-deployment
   namespace: kubeaudit
+  annotations:
+    # Local kind workflow: the image is built and side-loaded as kubeaudit-ai:latest.
+    kubeaudit.ai/ignore: "KA009"
 spec:
   replicas: 1
   selector:
@@ -18,6 +21,7 @@ spec:
       labels:
         app: kubeaudit
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -37,12 +41,33 @@ spec:
             - "/etc/certs/tls.key"
             - "--ssl-certfile"
             - "/etc/certs/tls.crt"
+          env:
+            - name: DATABASE_URL
+              value: "sqlite:////data/kubeaudit.db"
           ports:
             - containerPort: 8443
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: tls-certs
               mountPath: "/etc/certs"
               readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           resources:
             limits:
               cpu: "500m"
@@ -53,10 +78,16 @@ spec:
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: tls-certs
           secret:
             secretName: kubeaudit-tls
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

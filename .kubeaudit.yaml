@@ -1,0 +1,5 @@
+# KubeAudit configuration for this repository.
+fail_on: high
+exclude:
+  - "tests/fixtures/*"                   # deliberately insecure test data
+  - "manifests/sample-deployment.yaml"   # deliberately insecure demo for the webhook walkthrough
