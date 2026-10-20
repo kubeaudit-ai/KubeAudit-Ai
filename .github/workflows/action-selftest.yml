@@ -14,7 +14,7 @@ jobs:
   insecure-fixture:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run action on insecure manifests
         id: ka
         uses: ./
@@ -35,7 +35,7 @@ jobs:
   secure-fixture:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run action on secure manifests (must pass)
         uses: ./
         with:
@@ -47,7 +47,7 @@ jobs:
   this-repo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Scan this repo's own manifests and chart
         uses: ./
         with:

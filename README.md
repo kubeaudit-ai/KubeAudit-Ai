@@ -26,8 +26,8 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: msharsha565-create/KubeAudit-Ai@v1.1.0
+      - uses: actions/checkout@v5
+      - uses: msharsha565-create/KubeAudit-Ai@v1.1.1
         with:
           fail-on: high        # critical | high | medium | low | none
           only-changed: true   # scan just the files this PR touches
@@ -41,6 +41,7 @@ jobs:
 | `min-severity` | `low` | Hide findings below this severity |
 | `ignore` | | Comma-separated rule IDs to skip |
 | `comment` | `true` | Post or update one summary comment on the PR |
+| `comment-key` | workflow/job | Keeps separate KubeAudit jobs from overwriting each other's PR comment |
 | `sarif` | `true` | Upload to code scanning (private repos need GitHub Advanced Security) |
 | `setup-helm` | `true` | Install Helm to render charts |
 
