@@ -1,0 +1,20 @@
+# How a customer uses the published Action (from the Marketplace).
+name: KubeAudit (published Action demo)
+on:
+  pull_request:
+    paths: ["demo/**"]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msharsha565-create/KubeAudit-Ai@v1.1.0
+        with:
+          fail-on: high
+          only-changed: true
