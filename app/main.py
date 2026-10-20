@@ -27,6 +27,7 @@ import yaml
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 from app.policy_engine import policy_engine
+from app.rules import image_is_pinned
 from app.patch_guard import ai_mutations_enabled, filter_ai_patches
 
 
@@ -120,7 +121,7 @@ def inspect_container_list(containers: List[Dict[str, Any]], container_type: str
         c_name = container.get("name", "unnamed")
         image = container.get("image", "")
 
-        if ":" not in image or image.endswith(":latest"):
+        if not image_is_pinned(image):
             issues.append(Issue(
                 severity="Medium",
                 rule="AvoidLatestTag",
@@ -212,12 +213,8 @@ def analyze_manifest(doc: Dict[str, Any]) -> List[Issue]:
 
 def patch_container(container: Dict[str, Any], fixes: List[str]):
     c_name = container.get("name", "unnamed")
-    image = container.get("image", "")
-    if ":" not in image or image.endswith(":latest"):
-        base_image = image.split(":")[0] if ":" in image else image
-        fallback_image = f"{base_image}:alpine" if base_image == "nginx" else f"{base_image}:1.0.0"
-        container["image"] = fallback_image
-        fixes.append(f"Pinned image for container '{c_name}' from '{image}' to '{fallback_image}'")
+    # Images are never rewritten: we can't know which real version to pin to.
+    # Unpinned images are still reported by /audit and /validate.
 
     sec_ctx = container.setdefault("securityContext", {})
     if sec_ctx.get("privileged", False):
@@ -295,16 +292,6 @@ def generate_pod_spec_patches(pod_spec: Dict[str, Any], path_prefix: str) -> Lis
     containers = pod_spec.get("containers", [])
     for idx, container in enumerate(containers):
         c_prefix = f"{path_prefix}/containers/{idx}"
-        image = container.get("image", "")
-
-        if ":" not in image or image.endswith(":latest"):
-            base_image = image.split(":")[0] if ":" in image else image
-            fallback_image = f"{base_image}:alpine" if base_image == "nginx" else f"{base_image}:1.0.0"
-            patches.append({
-                "op": "replace" if "image" in container else "add",
-                "path": f"{c_prefix}/image",
-                "value": fallback_image
-            })
 
         c_sec = container.get("securityContext")
         if c_sec is None:
@@ -438,8 +425,8 @@ async def validate_admission(request: Request):
         })
 
     issues = analyze_manifest(object_spec)
-    rego_violations = policy_engine.evaluate(object_spec)
-    for rv in rego_violations:
+    engine_violations = policy_engine.evaluate(object_spec)
+    for rv in engine_violations:
         if not any(i.rule == rv["rule"] for i in issues):
             issues.append(Issue(severity=rv["severity"], rule=rv["rule"], message=rv["message"]))
             

@@ -44,12 +44,8 @@ def remediate_document(doc: dict, all_fixes: list = None):
                 c_sec["allowPrivilegeEscalation"] = False
                 all_fixes.append(f"Set container '{name}' securityContext.allowPrivilegeEscalation: false")
 
-            # Pin image tag
-            image = c.get("image", "")
-            if image.endswith(":latest") or ":" not in image:
-                base = image.split(":")[0]
-                c["image"] = f"{base}:pinned"
-                all_fixes.append(f"Pinned image for container '{name}'")
+            # Images are never rewritten (the right version can't be guessed);
+            # `kubeaudit scan` reports unpinned images for a human to pin.
 
             # Limits / requests
             res = c.setdefault("resources", {})

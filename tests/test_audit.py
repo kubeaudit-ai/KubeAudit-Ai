@@ -208,7 +208,7 @@ def test_mutate_admission_generates_json_patch():
     decoded_patch = json.loads(base64.b64decode(data["response"]["patch"]).decode("utf-8"))
     paths = [p["path"] for p in decoded_patch]
     assert "/spec/template/spec/securityContext" in paths
-    assert "/spec/template/spec/containers/0/image" in paths
+    assert "/spec/template/spec/containers/0/image" not in paths  # images are never rewritten
 
 def test_metrics_endpoint():
     response = client.get("/metrics")

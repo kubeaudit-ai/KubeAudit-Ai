@@ -1,17 +1,10 @@
-import os
 from typing import Any, Dict, List
 
-POLICY_PATH = os.getenv("POLICY_PATH", "policies/kubernetes.rego")
+from app.rules import image_is_pinned
 
-class RegoPolicyEngine:
-    def __init__(self, policy_file: str = POLICY_PATH):
-        self.policy_file = policy_file
-        self.rules_loaded = False
-        self._load_policy()
 
-    def _load_policy(self):
-        if os.path.exists(self.policy_file):
-            self.rules_loaded = True
+class PolicyEngine:
+    """Built-in Python admission checks. This is not an OPA/Rego evaluator."""
 
     def evaluate(self, manifest: Any) -> List[Dict[str, str]]:
         if not isinstance(manifest, dict):
@@ -66,7 +59,7 @@ class RegoPolicyEngine:
                     })
 
                 image = c.get("image", "")
-                if image.endswith(":latest") or ":" not in image:
+                if not image_is_pinned(image):
                     violations.append({
                         "rule": "AvoidLatestTag",
                         "severity": "Medium",
@@ -86,4 +79,4 @@ class RegoPolicyEngine:
 
         return violations
 
-policy_engine = RegoPolicyEngine()
+policy_engine = PolicyEngine()

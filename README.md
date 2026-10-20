@@ -112,7 +112,7 @@ The same project also ships a validating and mutating admission webhook. The sec
 * **Automated TLS (`cert-manager`*)*: Issues self-signed cluster certificates and leverages `cert-manager.io/inject-ca-from` to populate the admission webhook `caBundle`$ynamically.
 * **Self-Healing Webhook**:
   * **Validating Webhook**: Intercepts admission requests and denies non-compliant deployments (`runAsNonRoot: false`, privileged containers, missing resource limits).
-  * **Mutating Webhook**: Transparently patches insecure manifests during creation (pins `:alpine` tags, injects non-root security contexts, and applies default CPU/memory limits).
+  * **Mutating Webhook**: Transparently patches insecure manifests during creation (injects non-root security contexts and default CPU/memory limits). Images are never rewritten; unpinned images are reported instead.
 * **Helm Packaging (`charts/kubeaudit-ai`*)*: Complete Helm v2 deployment with automated `helm test` health verification.
 
 ---
