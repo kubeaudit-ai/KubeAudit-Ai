@@ -27,10 +27,29 @@ def _config() -> Config:
     return cfg
 
 
+def _connect_with_retry(timeout: float = None):
+    """Hosted databases (and private networks) can take a few seconds to come up after a deploy."""
+    import os
+    import time
+    from sqlalchemy.exc import OperationalError
+
+    timeout = float(os.getenv("DB_CONNECT_TIMEOUT", "60")) if timeout is None else timeout
+    deadline, delay = time.monotonic() + timeout, 1.0
+    while True:
+        try:
+            return engine.connect()
+        except OperationalError as e:
+            if time.monotonic() + delay > deadline:
+                raise
+            log.warning("Database not reachable yet (%s); retrying in %.0fs", str(e.orig).splitlines()[0] if e.orig else e, delay)
+            time.sleep(delay)
+            delay = min(delay * 2, 8.0)
+
+
 def upgrade_database() -> None:
     cfg = _config()
     is_pg = engine.dialect.name == "postgresql"
-    with engine.connect() as conn:
+    with _connect_with_retry() as conn:
         if is_pg:
             conn.execute(text("SELECT pg_advisory_lock(:id)"), {"id": LOCK_ID})
         try:

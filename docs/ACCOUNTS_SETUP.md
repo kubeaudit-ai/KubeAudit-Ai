@@ -6,13 +6,21 @@ app shows or hides the matching buttons on its own (`GET /v1/auth/providers`).
 All settings are **environment variables on the Railway service** (Service → Variables).
 Railway redeploys after you save them.
 
+## 0. How Railway runs this app
+
+The Railway service runs a published Docker image, `ghcr.io/msharsha565-create/kubeaudit-ai:<version>`.
+Publishing a GitHub release `vX.Y.Z` builds image `X.Y.Z`. To update the server, set
+**Settings → Source → Image** to the new tag and deploy.
+
 ## 1. Database (do this first)
 
 Without a database, accounts are lost every time Railway redeploys.
 
 1. In your Railway project: **New → Database → PostgreSQL**.
-2. On the KubeAudit service, add a variable `DATABASE_URL` with the value `${{Postgres.DATABASE_URL}}`
-   (Railway fills in the real address).
+2. On the KubeAudit service: **Variables → New Variable → Add Reference** → your Postgres service →
+   `DATABASE_URL`. Use **Add Reference** rather than typing, so the service name is right.
+   If the logs say `failed to resolve host 'postgres.railway.internal'`, the private network wasn't ready;
+   version 1.1.2+ waits up to 60 seconds for it. On older versions use `DATABASE_PUBLIC_URL` instead.
 3. The app creates and updates its tables automatically when it starts.
 
 ## 2. Sign in with GitHub
