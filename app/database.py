@@ -3,7 +3,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models import Base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./kubeaudit.db")
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip().strip('"').strip("'")
+if "${{" in DATABASE_URL or (os.getenv("DATABASE_URL") is not None and not DATABASE_URL):
+    raise RuntimeError(
+        "DATABASE_URL is set but empty or still contains an unresolved reference like ${{Postgres.DATABASE_URL}}. "
+        "On Railway, delete the variable and re-add it with New Variable > Add Reference > your Postgres service."
+    )
+DATABASE_URL = DATABASE_URL or "sqlite:///./kubeaudit.db"
 
 # Hosting platforms hand out postgres:// or postgresql:// URLs; use the psycopg 3 driver.
 for prefix in ("postgres://", "postgresql://"):
