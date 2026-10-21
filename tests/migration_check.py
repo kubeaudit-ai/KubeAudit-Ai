@@ -50,6 +50,8 @@ elif scenario == "cycle":
     upgrade_database()
 
 assert {"users", "sessions", "login_tokens", "scans", "audit_logs"} <= tables(), tables()
+from sqlalchemy import inspect as _i
+assert {"google_id", "microsoft_id", "billing_interval"} <= {c["name"] for c in _i(engine).get_columns("users")}
 with engine.connect() as c:
     v = c.execute(text("SELECT version_num FROM alembic_version")).scalar()
 print(f"{engine.dialect.name} {scenario}: OK (version {v})")

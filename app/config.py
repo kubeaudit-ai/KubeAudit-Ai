@@ -17,6 +17,10 @@ class Settings:
 
         self.github_client_id = _env("GITHUB_CLIENT_ID")
         self.github_client_secret = _env("GITHUB_CLIENT_SECRET")
+        self.google_client_id = _env("GOOGLE_CLIENT_ID")
+        self.google_client_secret = _env("GOOGLE_CLIENT_SECRET")
+        self.microsoft_client_id = _env("MICROSOFT_CLIENT_ID")
+        self.microsoft_client_secret = _env("MICROSOFT_CLIENT_SECRET")
 
         # Email: "resend" (needs RESEND_API_KEY). For development only: "console" (log the link)
         # or "file:/path". Email sign-in stays hidden until a real backend is configured.
@@ -26,7 +30,8 @@ class Settings:
 
         self.stripe_secret_key = _env("STRIPE_SECRET_KEY")
         self.stripe_webhook_secret = _env("STRIPE_WEBHOOK_SECRET")
-        self.stripe_price_id_pro = _env("STRIPE_PRICE_ID_PRO")
+        self.stripe_price_id_pro = _env("STRIPE_PRICE_ID_PRO")                # monthly price
+        self.stripe_price_id_pro_yearly = _env("STRIPE_PRICE_ID_PRO_YEARLY")  # optional yearly price
 
         self.session_days = int(_env("SESSION_DAYS", "30"))
         self.free_monthly_scans = int(_env("FREE_MONTHLY_SCANS", "50"))
@@ -35,6 +40,18 @@ class Settings:
     @property
     def github_enabled(self) -> bool:
         return bool(self.github_client_id and self.github_client_secret)
+
+    @property
+    def google_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def microsoft_enabled(self) -> bool:
+        return bool(self.microsoft_client_id and self.microsoft_client_secret)
+
+    @property
+    def yearly_enabled(self) -> bool:
+        return self.billing_enabled and bool(self.stripe_price_id_pro_yearly)
 
     @property
     def email_enabled(self) -> bool:

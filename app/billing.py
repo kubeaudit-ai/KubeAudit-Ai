@@ -1,9 +1,10 @@
 """Stripe billing: Pro checkout ($9/month price set in STRIPE_PRICE_ID_PRO), customer portal, webhooks."""
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 import stripe
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session as DbSession
 
@@ -30,15 +31,26 @@ def _with_query(url: str, **params) -> str:
     return url + ("&" if "?" in url else "?") + urlencode(params)
 
 
+class CheckoutIn(BaseModel):
+    plan: Literal["monthly", "yearly"] = "monthly"
+
+
 @router.post("/checkout")
-def create_checkout(user: User = Depends(require_session_user)):
+def create_checkout(body: Optional[CheckoutIn] = None, user: User = Depends(require_session_user)):
     _stripe()
     s = get_settings()
+    plan = body.plan if body else "monthly"
     if user.is_pro:
         raise HTTPException(status.HTTP_409_CONFLICT, "You're already on Pro.")
+    if plan == "yearly" and not s.stripe_price_id_pro_yearly:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The yearly plan isn't available yet.")
+    price = s.stripe_price_id_pro_yearly if plan == "yearly" else s.stripe_price_id_pro
+    refund_url = s.app_url.rstrip("/") + "/refund.html"
     params = dict(
         mode="subscription",
-        line_items=[{"price": s.stripe_price_id_pro, "quantity": 1}],
+        line_items=[{"price": price, "quantity": 1}],
+        custom_text={"submit": {"message": f"14-day money-back guarantee on your first payment. Cancel anytime from "
+                                           f"Manage billing. Refund policy: {refund_url}"}},
         client_reference_id=str(user.id),
         metadata={"user_id": str(user.id)},
         subscription_data={"metadata": {"user_id": str(user.id)}},
@@ -100,6 +112,10 @@ def _apply_subscription(user: User, sub) -> None:
     st = _get(sub, "status")
     user.stripe_subscription_id = _get(sub, "id")
     user.subscription_status = st or user.subscription_status
+    item = _get(_get(_get(sub, "items"), "data", [{}]), 0, {})
+    interval = _get(_get(_get(item, "price"), "recurring"), "interval") or _get(_get(item, "plan"), "interval")
+    if interval in ("month", "year"):
+        user.billing_interval = interval
     user.subscription_tier = PlanTier.PRO if st in PRO_STATUSES else PlanTier.FREE
     # Newer Stripe API versions put the period end on the subscription item.
     end = _get(sub, "current_period_end") or _get(_get(_get(_get(sub, "items"), "data", [{}]), 0, {}), "current_period_end")
@@ -156,6 +172,7 @@ async def stripe_webhook(request: Request, db: DbSession = Depends(get_db)):
             user.subscription_status = "canceled"
             user.stripe_subscription_id = None
             user.current_period_end = None
+            user.billing_interval = None
         else:
             _apply_subscription(user, sub)
         db.commit()

@@ -19,9 +19,13 @@ The web app uses a JavaScript port of the same rule engine. CI checks that both 
 
 ### Accounts and Pro
 
-Sign in with GitHub or email to get an API key. **Pro ($9/month)** adds saved scan history, shareable report links,
+Sign in with GitHub, Google, Microsoft or any email address to get an API key. **Pro ($9/month or $90/year, 14-day money-back
+guarantee)** adds saved scan history, shareable report links,
 custom rule settings and 2,500 API scans a month. Scanning itself always stays in your browser; an account stores
-only what you choose to save. Setup for the server: [docs/ACCOUNTS_SETUP.md](docs/ACCOUNTS_SETUP.md).
+only what you choose to save. [Terms](https://msharsha565-create.github.io/KubeAudit-Ai/terms.html) ·
+[Privacy](https://msharsha565-create.github.io/KubeAudit-Ai/privacy.html) ·
+[Refunds & cancellation](https://msharsha565-create.github.io/KubeAudit-Ai/refund.html).
+Setup for the server: [docs/ACCOUNTS_SETUP.md](docs/ACCOUNTS_SETUP.md).
 
 ## GitHub Action
 

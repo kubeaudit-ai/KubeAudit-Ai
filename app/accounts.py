@@ -61,6 +61,10 @@ def _user_payload(db: DbSession, user: User) -> dict:
     return {
         "id": str(user.id), "email": user.email, "name": user.name, "avatar_url": user.avatar_url,
         "github": bool(user.github_id),
+        "google": bool(user.google_id),
+        "microsoft": bool(user.microsoft_id),
+        "billing_interval": user.billing_interval,
+        "yearly_enabled": s.yearly_enabled,
         "plan": "pro" if user.is_pro else "free",
         "subscription_status": user.subscription_status,
         "current_period_end": user.current_period_end.isoformat() + "Z" if user.current_period_end else None,
@@ -77,7 +81,8 @@ def _user_payload(db: DbSession, user: User) -> dict:
 @router.get("/auth/providers")
 def providers():
     s = get_settings()
-    return {"github": s.github_enabled, "email": s.email_enabled, "billing": s.billing_enabled}
+    return {"github": s.github_enabled, "google": s.google_enabled, "microsoft": s.microsoft_enabled,
+            "email": s.email_enabled, "billing": s.billing_enabled, "yearly": s.yearly_enabled}
 
 
 # ---------------------------------------------------------------- GitHub OAuth

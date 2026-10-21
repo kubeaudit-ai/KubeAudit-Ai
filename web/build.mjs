@@ -46,8 +46,7 @@ ${rest}
 </html>
 `;
 fs.writeFileSync(path.join(out, "site", "index.html"), site);
-for (const f of ["manifest.webmanifest", "sw.js", "icon.svg", "icon-192.png", "icon-512.png"]) {
-  const src = path.join(here, "public", f);
-  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(out, "site", f));
+for (const f of fs.readdirSync(path.join(here, "public"))) {
+  fs.copyFileSync(path.join(here, "public", f), path.join(out, "site", f));
 }
 console.log(`app.html ${(body.length / 1024).toFixed(1)} KB, bundle ${(bundle.length / 1024).toFixed(1)} KB`);

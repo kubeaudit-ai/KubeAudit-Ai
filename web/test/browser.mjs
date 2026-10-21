@@ -136,7 +136,7 @@ print(sum(len(scan_text(Path(f).read_text(), f, Config())[0]) for f in sys.argv[
   const ok = await page.evaluate(async () => {
     const reg = await navigator.serviceWorker.ready;
     for (let i = 0; i < 50; i++) {
-      const c = await caches.open("kubeaudit-v1");
+      const c = await caches.open("kubeaudit-v2");
       const keys = (await c.keys()).map((r) => new URL(r.url).pathname);
       if (keys.some((k) => k.endsWith("/index.html")) && keys.some((k) => k.endsWith("icon-512.png"))) return !!reg.active;
       await new Promise((r) => setTimeout(r, 100));

@@ -1,6 +1,6 @@
 // Offline support: cache the app shell and the pinned YAML library.
-const CACHE = "kubeaudit-v1";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
+const CACHE = "kubeaudit-v2";
+const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "terms.html", "privacy.html", "refund.html"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

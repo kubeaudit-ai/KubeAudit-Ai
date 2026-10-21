@@ -1,4 +1,4 @@
-// Accounts: sign-in (GitHub, email link), Pro upgrade, API key, saved history, shared reports, rule settings.
+// Accounts: sign-in (GitHub, Google, Microsoft, email link), Pro upgrade, API key, saved history, shared reports, rule settings.
 // The API address is fixed at build time (never read from the URL) so a crafted link
 // can't redirect sign-in tokens to another server.
 /* global __API_URL__ */
@@ -90,17 +90,20 @@ export function initAccount(app) {
       <h2>Sign in to KubeAudit AI</h2>
       <p class="muted">${esc(typeof reason === "string" ? reason : "Save your scans, share reports with your team, and get an API key for CI.")}</p>
       <div class="stack">
-        ${p.github ? `<a class="btn gh" href="${esc(API)}/v1/auth/github/start"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>Continue with GitHub</a>` : ""}
-        ${p.github && p.email ? `<div class="or"><span>or</span></div>` : ""}
+        ${[["github", "GitHub"], ["google", "Google"], ["microsoft", "Microsoft (Outlook)"]].filter(([k]) => p[k]).map(([k, label]) =>
+          `<a class="btn oauth" href="${esc(API)}/v1/auth/${k}/start">Continue with ${label}</a>`).join("")}
+        ${(p.github || p.google || p.microsoft) && p.email ? `<div class="or"><span>or use any email address</span></div>` : ""}
         ${p.email ? `<form id="emailform" class="stack" novalidate>
           <label for="email-in">Email</label>
           <input id="email-in" type="email" autocomplete="email" required placeholder="you@company.com">
           <button type="submit" class="btn primary">Email me a sign-in link</button>
           <p class="err" id="email-err" hidden></p>
         </form>` : ""}
-        ${!p.github && !p.email ? `<p class="notice">Sign-in isn't available right now. You can keep using the scanner without an account.</p>` : ""}
+        ${!p.github && !p.google && !p.microsoft && !p.email ? `<p class="notice">Sign-in isn't available right now. You can keep using the scanner without an account.</p>` : ""}
       </div>
-      <p class="muted small">Scanning stays in your browser. An account only stores what you choose to save.</p>`);
+      <p class="muted small">Scanning stays in your browser. An account only stores what you choose to save.
+        By continuing you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and
+        <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`);
     const form = $("#emailform", d);
     if (form) form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -136,11 +139,17 @@ export function initAccount(app) {
 
       <section class="acard" id="sec-plan">
         <h3>Plan</h3>
-        ${pro ? `<p><strong>KubeAudit AI Pro</strong>, $9/month${renew ? `. Renews ${esc(renew)}.` : "."}</p>
+        ${pro ? `<p><strong>KubeAudit AI Pro</strong>, ${m.billing_interval === "year" ? "$90/year" : "$9/month"}${renew ? `. Renews ${esc(renew)}.` : "."}</p>
+          <p class="muted small">Cancel anytime in Manage billing; Pro stays on until the end of the period you paid for. New subscribers can get a full refund within 14 days. <a href="refund.html" target="_blank" rel="noopener">Refund policy</a></p>
           ${m.billing_enabled ? `<button type="button" class="btn" id="portal">Manage billing</button>` : ""}`
         : `<p>You're on the free plan: unlimited scanning in the browser and ${usage.monthly_limit} API scans a month.</p>
           <ul class="perks"><li>Saved scan history you can reopen</li><li>Shareable report links for your team or clients</li><li>Your own rule settings, applied everywhere</li><li>2,500 API scans a month for CI and the CLI</li></ul>
-          ${m.billing_enabled ? `<button type="button" class="btn primary" id="upgrade">Upgrade to Pro · $9/month</button>` : `<p class="notice">Upgrades open soon.</p>`}
+          ${m.billing_enabled ? `<div class="plans">
+              <button type="button" class="plan-opt" data-plan="monthly"><strong>Monthly</strong><span>$9 / month</span></button>
+              ${m.yearly_enabled ? `<button type="button" class="plan-opt best" data-plan="yearly"><strong>Yearly</strong><span>$90 / year</span><em>2 months free</em></button>` : ""}
+            </div>
+            <p class="muted small">14-day money-back guarantee. Cancel anytime. <a href="refund.html" target="_blank" rel="noopener">Refund policy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>`
+            : `<p class="notice">Upgrades open soon.</p>`}
           ${m.subscription_status === "past_due" ? `<p class="err">Your last payment failed. Update your card in Manage billing to keep Pro.</p>` : ""}
           ${m.has_billing_account && m.billing_enabled ? `<button type="button" class="btn" id="portal">Manage billing</button>` : ""}`}
       </section>
@@ -174,7 +183,8 @@ export function initAccount(app) {
         <span class="danger" id="deletewrap"><button type="button" class="linkbtn" id="delacct">Delete account</button></span>
       </footer>`, { wide: true });
 
-    $("#upgrade", d)?.addEventListener("click", (e) => goBilling("/v1/billing/checkout", e.currentTarget));
+    d.querySelectorAll(".plan-opt").forEach((b) => b.addEventListener("click", (e) =>
+      goBilling("/v1/billing/checkout", e.currentTarget, { plan: e.currentTarget.dataset.plan })));
     $("#portal", d)?.addEventListener("click", (e) => goBilling("/v1/billing/portal", e.currentTarget));
     $("#genkey", d).addEventListener("click", async (e) => {
       const b = e.currentTarget;
@@ -205,12 +215,12 @@ export function initAccount(app) {
     if (focus) $(`#sec-${focus}`, d)?.scrollIntoView({ block: "start" });
   }
 
-  async function goBilling(path, btn) {
+  async function goBilling(path, btn, body) {
     btn.disabled = true;
-    const label = btn.textContent;
-    btn.textContent = "Opening…";
-    try { const r = await api(path, { method: "POST" }); window.location.assign(r.url); }
-    catch (e) { toast(e.message); btn.disabled = false; btn.textContent = label; }
+    const html = btn.innerHTML;
+    btn.textContent = "Opening checkout…";
+    try { const r = await api(path, { method: "POST", ...(body ? { body } : {}) }); window.location.assign(r.url); }
+    catch (e) { toast(e.message); btn.disabled = false; btn.innerHTML = html; }
   }
 
   // ---------------------------------------------------------------- history

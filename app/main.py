@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.billing import router as billing_router
 from app.accounts import router as accounts_router
+from app.oauth import router as oauth_router
 from app.config import get_settings
 from app.migrate import upgrade_database
 from fastapi.middleware.cors import CORSMiddleware
@@ -548,6 +549,7 @@ async def mutate_admission(request: Request):
 # Register commercial billing routes
 app.include_router(billing_router)
 app.include_router(accounts_router)
+app.include_router(oauth_router)
 
 
 

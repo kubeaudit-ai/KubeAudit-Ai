@@ -26,7 +26,8 @@ execFileSync("node", [path.join(here, "..", "build.mjs")], { env: { ...process.e
 const api = spawn("python", ["-m", "uvicorn", "app.main:app", "--port", String(apiPort), "--log-level", "warning"], {
   cwd: repo,
   env: { ...process.env, DATABASE_URL: `sqlite:///${dbFile}`, EMAIL_BACKEND: `file:${outbox}`, APP_URL: SITE, API_URL: API,
-         CORS_ORIGINS: `http://127.0.0.1:${sitePort}`, GITHUB_CLIENT_ID: "test-client", GITHUB_CLIENT_SECRET: "test-secret" },
+         CORS_ORIGINS: `http://127.0.0.1:${sitePort}`, GITHUB_CLIENT_ID: "test-client", GITHUB_CLIENT_SECRET: "test-secret",
+         GOOGLE_CLIENT_ID: "g", GOOGLE_CLIENT_SECRET: "g", MICROSOFT_CLIENT_ID: "m", MICROSOFT_CLIENT_SECRET: "m" },
   stdio: ["ignore", "inherit", "inherit"],
 });
 for (let i = 0; i < 100; i++) {
@@ -70,8 +71,12 @@ try {
   // 1. Sign in by email
   await page.click("#signin");
   await page.waitForSelector("#dlg-signin[open]");
-  const gh = await page.getAttribute("#dlg-signin a.gh", "href");
-  check(gh === `${API}/v1/auth/github/start`, "GitHub button goes to the API's GitHub sign-in");
+  const buttons = await page.$$eval("#dlg-signin a.oauth", (a) => a.map((x) => [x.textContent.trim(), x.getAttribute("href")]));
+  check(JSON.stringify(buttons) === JSON.stringify([["Continue with GitHub", `${API}/v1/auth/github/start`],
+    ["Continue with Google", `${API}/v1/auth/google/start`], ["Continue with Microsoft (Outlook)", `${API}/v1/auth/microsoft/start`]]),
+    "sign-in offers GitHub, Google and Microsoft, each going to the API");
+  check(await page.isVisible("#dlg-signin a[href='terms.html']") && await page.isVisible("#dlg-signin a[href='privacy.html']"),
+    "sign-in links to the Terms and Privacy Policy");
   await page.fill("#email-in", "Sai@Example.com");
   await page.click("#emailform button[type=submit]");
   await page.waitForSelector("#dlg-signin .sent");
@@ -168,6 +173,14 @@ try {
   await page.screenshot({ path: `${shots}/account-phone.png` });
   await page.click("#dlg-account .x");
   await page.setViewportSize({ width: 1280, height: 900 });
+
+  // Legal pages are served and linked from the footer
+  for (const [href, text] of [["terms.html", "Terms of Service"], ["privacy.html", "Privacy Policy"], ["refund.html", "14-day money-back"]]) {
+    const html = await (await fetch(SITE + href)).text();
+    check(html.includes(text), `${href} is published`);
+  }
+  check((await page.$$eval("footer .legal a", (a) => a.map((x) => x.getAttribute("href")))).join() === "terms.html,privacy.html,refund.html",
+    "footer links to Terms, Privacy and Refunds");
 
   // 9. Sign out
   await page.click("#openacct");

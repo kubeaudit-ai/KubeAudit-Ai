@@ -27,6 +27,8 @@ class User(Base):
     name = Column(String(255), nullable=True)
     avatar_url = Column(String(512), nullable=True)
     github_id = Column(String(32), unique=True, nullable=True, index=True)
+    google_id = Column(String(64), unique=True, nullable=True, index=True)
+    microsoft_id = Column(String(96), unique=True, nullable=True, index=True)
 
     # Legacy plaintext column, emptied by the accounts migration. Keys are stored hashed.
     api_key = Column(String(128), unique=True, nullable=True, index=True)
@@ -35,6 +37,7 @@ class User(Base):
 
     stripe_customer_id = Column(String(128), unique=True, nullable=True)
     stripe_subscription_id = Column(String(128), nullable=True)
+    billing_interval = Column(String(8), nullable=True)  # "month" or "year"
     subscription_tier = Column(Enum(PlanTier), default=PlanTier.FREE, nullable=False)
     subscription_status = Column(String(50), default="active", nullable=False)
     current_period_end = Column(DateTime, nullable=True)

@@ -184,7 +184,8 @@ def test_email_sign_in_hidden_until_configured(monkeypatch):
 
 def test_github_not_configured():
     assert client.get("/v1/auth/github/start", follow_redirects=False).status_code == 503
-    assert client.get("/v1/auth/providers").json() == {"github": False, "email": True, "billing": False}
+    assert client.get("/v1/auth/providers").json() == {"github": False, "google": False, "microsoft": False,
+                                                       "email": True, "billing": False, "yearly": False}
 
 
 def test_github_sign_in_and_exchange(github):
