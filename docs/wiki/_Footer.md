@@ -1,0 +1,1 @@
+[Web app](https://kubeaudit-ai.github.io/) · [Report an issue](https://github.com/kubeaudit-ai/KubeAudit-Ai/issues/new) · [Terms](https://kubeaudit-ai.github.io/terms.html) · [Privacy](https://kubeaudit-ai.github.io/privacy.html) · [Refunds](https://kubeaudit-ai.github.io/refund.html)
